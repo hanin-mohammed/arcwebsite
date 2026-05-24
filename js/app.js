@@ -37,7 +37,15 @@ const els = {
   theme: document.getElementById("themeBtn"),
   greeting: document.getElementById("greetingText"),
   greetingArabic: document.getElementById("greetingArabic"),
+  greetingWrap: document.querySelector(".greeting"),
   tabs: Array.from(document.querySelectorAll(".tab")),
+};
+
+const splashState = {
+  el: null,
+  shownAt: 0,
+  hidden: false,
+  minDuration: 1200,
 };
 
 function endpoint(params = {}) {
@@ -152,8 +160,15 @@ function updateGreeting() {
     arabic = "مساء الخير يا سيدي";
   }
 
-  els.greeting.textContent = english;
-  els.greetingArabic.textContent = arabic;
+  if (els.greetingWrap) {
+    els.greetingWrap.classList.add("is-fading");
+  }
+
+  window.setTimeout(() => {
+    els.greeting.textContent = english;
+    els.greetingArabic.textContent = arabic;
+    els.greetingWrap?.classList.remove("is-fading");
+  }, 120);
 }
 
 function metric(label, amount, count) {
@@ -217,7 +232,26 @@ function showError(message) {
 }
 
 function setView(html) {
-  els.view.innerHTML = `<div class="page-in cards-animate">${html}</div>`;
+  els.view.innerHTML = `<div class="page-in">${html}</div>`;
+  window.requestAnimationFrame(animateVisibleCards);
+}
+
+function animateVisibleCards() {
+  const items = Array.from(els.view.querySelectorAll(".card, .board"));
+  if (!items.length) return;
+
+  let revealIndex = 0;
+  const viewportCutoff = window.innerHeight * 0.92;
+
+  items.forEach((item) => {
+    const rect = item.getBoundingClientRect();
+    if (rect.top <= viewportCutoff) {
+      const delay = Math.min(revealIndex, 4) * 50;
+      item.style.setProperty("--reveal-delay", `${delay}ms`);
+      item.classList.add("is-reveal");
+      revealIndex += 1;
+    }
+  });
 }
 
 function updateTabs() {
@@ -802,6 +836,7 @@ async function refreshData() {
   } finally {
     state.loading = false;
     els.refresh.classList.remove("is-spinning");
+    requestHideSplash();
   }
 }
 
@@ -850,9 +885,43 @@ function boot() {
   if (pages[hashPage]) state.activePage = hashPage;
   updateGreeting();
   initTheme();
+  mountSplash();
   bindEvents();
   updateTabs();
   refreshData();
+}
+
+function mountSplash() {
+  const splash = document.createElement("div");
+  splash.className = "splash";
+  splash.innerHTML = `<div class="splash-logo" role="img" aria-label="Al Raked logo"></div>`;
+  document.body.appendChild(splash);
+  splashState.el = splash;
+  splashState.shownAt = performance.now();
+  splashState.hidden = false;
+
+  window.requestAnimationFrame(() => {
+    splash.classList.add("is-visible");
+  });
+  document.addEventListener("pointerdown", () => requestHideSplash(true), { once: true });
+  document.addEventListener("keydown", () => requestHideSplash(true), { once: true });
+}
+
+function requestHideSplash(force = false) {
+  const splash = splashState.el;
+  if (!splash || splashState.hidden) return;
+
+  const elapsed = performance.now() - splashState.shownAt;
+  const remaining = Math.max(0, splashState.minDuration - elapsed);
+  const delay = force ? 0 : remaining;
+
+  window.setTimeout(() => {
+    if (!splash.isConnected || splashState.hidden) return;
+    splashState.hidden = true;
+    splash.classList.add("is-hiding");
+    splash.addEventListener("transitionend", () => splash.remove(), { once: true });
+    setTimeout(() => splash.remove(), 1400);
+  }, delay);
 }
 
 boot();

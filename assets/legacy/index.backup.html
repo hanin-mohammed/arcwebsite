@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Al Raked Command Center</title>
+
+<link rel="stylesheet" href="./css/style.css">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+rel="stylesheet">
+
+</head>
+
+<body>
+
+<header class="top">
+
+<div class="title">
+
+Al Raked
+
+<span>
+
+Command Center
+
+</span>
+
+</div>
+
+<div class="actions">
+
+<button id="refreshBtn">
+
+↻
+
+</button>
+
+<button id="themeBtn">
+
+☾
+
+</button>
+
+</div>
+
+</header>
+
+<nav class="tabs">
+
+<button class="tab active"
+data-page="overview">
+Overview
+</button>
+
+<button class="tab"
+data-page="employees">
+Employees
+</button>
+
+<button class="tab"
+data-page="services">
+Services
+</button>
+
+<button class="tab"
+data-page="oil">
+Oil
+</button>
+
+<button class="tab"
+data-page="search">
+Search
+</button>
+
+<button class="tab"
+data-page="feed">
+Feed
+</button>
+
+</nav>
+
+<main>
+
+<div class="hero">
+
+<h1 id="pageTitle">
+
+Dashboard
+
+</h1>
+
+<p id="updated">
+
+Waiting…
+
+</p>
+
+</div>
+
+<div id="view">
+
+</div>
+
+</main>
+
+<script>
+
+const API=
+"https://script.google.com/macros/s/AKfycbw_q3WkDF_g-Nen-r3Km68Uf_Z0Uvu4vUo8bXG4RUvNbK3nMMVj33-ldbM1Ub1osHEU/exec"
+
+const KEY=
+"013187"
+
+let report
+let yesterday
+
+const view=
+document.getElementById(
+"view"
+)
+
+function money(
+v
+){
+
+return `AED ${Math.round(v||0)}`
+
+}
+
+function idleText(
+date
+){
+
+if(
+!date
+)
+return "No work"
+
+const mins=
+Math.floor(
+(
+Date.now()
+-
+new Date(
+date
+)
+)
+/60000
+)
+
+if(
+mins<60
+)
+return `${mins}m`
+
+const h=
+Math.floor(
+mins/60
+)
+
+const m=
+mins%60
+
+if(
+m===0
+)
+return `${h}h`
+
+return `${h}h ${m}m`
+
+}
+
+async function fetchData(
+y=false
+){
+
+return (
+await fetch(
+`${API}?key=${KEY}${y?"&yesterday=1":""}`,
+{
+cache:
+"no-store"
+}
+)
+)
+.json()
+
+}
+
+function block(
+title,
+amt,
+cars
+){
+
+return `
+
+<div class="mini">
+
+<div class="label">
+
+${title}
+
+</div>
+
+<div class="amt">
+
+${money(amt)}
+
+</div>
+
+<div class="cars">
+
+${cars||0}
+cars
+
+</div>
+
+</div>
+
+`
+
+}
+
+function board(
+title,
+html
+){
+
+return `
+
+<section class="board">
+
+<div class="boardTitle">
+
+${title}
+
+</div>
+
+<div class="inside">
+
+${html}
+
+</div>
+
+</section>
+
+`
+
+}
+
+function renderOverview(){
+
+const s=
+report.summary
+
+const y=
+yesterday.summary
+
+view.innerHTML=
+
+board(
+
+"Today",
+
+block(
+"Without Company",
+s.today.earnings,
+s.today.cars
+)
+
++
+
+block(
+"With Company",
+s.todayIncl.earnings,
+s.todayIncl.cars
+)
+
++
+
+block(
+"This Month",
+s.month.earnings,
+s.month.cars
+)
+
++
+
+block(
+"Month + Company",
+s.monthIncl.earnings,
+s.monthIncl.cars
+)
+
+)
+
++
+
+board(
+
+"Yesterday",
+
+block(
+"Without Company",
+y.today.earnings,
+y.today.cars
+)
+
++
+
+block(
+"With Company",
+y.todayIncl.earnings,
+y.todayIncl.cars
+)
+
+)
+
+}
+
+function renderEmployees(){
+
+view.innerHTML=
+
+board(
+
+"Employees",
+
+Object
+.entries(
+report.employees
+)
+
+.sort(
+(a,b)=>
+b[1].carsToday
+-
+a[1].carsToday
+)
+
+.map(
+([n,e])=>
+
+`
+
+<div class="mini">
+
+<div style="display:flex;justify-content:space-between">
+
+<b>
+
+${n}
+
+</b>
+
+${report.attendance?.[n]
+?
+"🟢"
+:
+"🔴"}
+
+</div>
+
+<br>
+
+${idleText(
+report.lastWork?.[n]
+)}
+
+<br><br>
+
+Today
+
+<br>
+
+${money(
+e.daily
+)}
+
+•
+
+${e.carsToday}
+
+<br><br>
+
+Month
+
+<br>
+
+${money(
+e.monthly
+)}
+
+•
+
+${e.carsMonth}
+
+</div>
+
+`
+
+)
+
+.join("")
+
+)
+
+}
+
+function renderServices(){
+
+view.innerHTML=
+
+Object
+.entries(
+report.services
+)
+
+.map(
+([n,s])=>
+
+board(
+
+n,
+
+block(
+"Today",
+s.today.earnings,
+s.today.cars
+)
+
++
+
+block(
+"Month",
+s.month.earnings,
+s.month.cars
+)
+
++
+
+block(
+"Company",
+s.todayIncl.earnings
+-
+s.today.earnings,
+
+s.todayIncl.cars
+-
+s.today.cars
+)
+
+)
+
+)
+
+.join("")
+
+}
+
+function renderOil(){
+
+const oil=
+
+Object
+.entries(
+report.oils||{}
+)
+
+.map(
+([n,v])=>
+
+block(
+n,
+v.monthlyAmt,
+v.monthlyCars
+)
+
+)
+
+.join("")
+
+const zeena=
+
+Object
+.entries(
+report.zeena||{}
+)
+
+.map(
+([n,v])=>
+
+block(
+n,
+v.monthlyAmt,
+v.monthlyCars
+)
+
+)
+
+.join("")
+
+view.innerHTML=
+
+board(
+"Oil",
+oil
+)
+
++
+
+board(
+"Zeena",
+zeena
+)
+
+}
+
+function renderPlaceholder(
+name
+){
+
+view.innerHTML=
+
+board(
+
+name,
+
+`
+
+<div class="placeholder">
+
+Coming next
+
+</div>
+
+`
+
+)
+
+}
+
+async function refresh(){
+
+report=
+await fetchData()
+
+yesterday=
+await fetchData(
+true
+)
+
+renderOverview()
+
+updated.textContent=
+
+"Updated • "
+
++
+
+new Date()
+.toLocaleTimeString()
+
+}
+
+document
+.querySelectorAll(
+".tab"
+)
+.forEach(
+b=>{
+
+b.onclick=
+()=>{
+
+document
+.querySelectorAll(
+".tab"
+)
+.forEach(
+x=>
+x.classList
+.remove(
+"active"
+)
+)
+
+b.classList
+.add(
+"active"
+)
+
+const p=
+b.dataset.page
+
+pageTitle.textContent=
+b.textContent
+
+if(
+p==="employees"
+)
+renderEmployees()
+
+else if(
+p==="services"
+)
+renderServices()
+
+else if(
+p==="oil"
+)
+renderOil()
+
+else if(
+p==="search"
+)
+renderPlaceholder(
+"Search"
+)
+
+else if(
+p==="feed"
+)
+renderPlaceholder(
+"Feed"
+)
+
+else
+renderOverview()
+
+}
+
+}
+)
+
+themeBtn.onclick=
+()=>{
+
+document.body
+.classList.toggle(
+"light"
+)
+
+}
+
+refreshBtn.onclick=
+refresh
+
+refresh()
+
+</script>
+
+</body>
+
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#07080b">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f5f8">
+  <title>Al Raked Dashboard</title>
+
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="greeting" aria-live="polite">
+          <p id="greetingText">Good day, Sir</p>
+          <p id="greetingArabic">مرحبا يا سيدي</p>
+        </div>
+        <p class="brand"><span class="brand-mark" aria-hidden="true"></span>Al Raked Dashboard</p>
+      </div>
+      <div class="actions" aria-label="Dashboard actions">
+        <button class="icon-button" id="refreshBtn" type="button" aria-label="Refresh dashboard">
+          <svg class="icon refresh-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 0-2.35 5.65"></path>
+            <path d="M20 5v6h-6"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Dashboard sections">
+      <div class="tabs-scroll">
+        <button class="tab is-active" type="button" data-page="overview">Overview</button>
+        <button class="tab" type="button" data-page="employees">Employees</button>
+        <button class="tab" type="button" data-page="services">Services</button>
+        <button class="tab" type="button" data-page="oil">Oil</button>
+        <button class="tab" type="button" data-page="zeena">Zeena</button>
+        <button class="tab" type="button" data-page="company">Company</button>
+        <button class="tab" type="button" data-page="employeeLookup">Employee Lookup</button>
+        <button class="tab" type="button" data-page="search">Search</button>
+      </div>
+    </nav>
+
+    <main>
+      <section class="page-head" aria-live="polite">
+        <h1 id="pageTitle">Overview</h1>
+        <p id="updatedText">Loading latest report</p>
+      </section>
+
+      <section id="view" class="view" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <script src="./js/app.js"></script>
+</body>
+</html>

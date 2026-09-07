@@ -182,34 +182,65 @@ function metric(label, amount, count) {
   `;
 }
 
+let chartId = 0;
+
+function smoothChartPath(points) {
+  if (points.length < 2) return `M ${points[0]?.x || 0} ${points[0]?.y || 0}`;
+  let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let index = 0; index < points.length - 1; index++) {
+    const p0 = points[Math.max(0, index - 1)];
+    const p1 = points[index];
+    const p2 = points[index + 1];
+    const p3 = points[Math.min(points.length - 1, index + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return path;
+}
+
 function sparkline(values, color = "red") {
   const clean = values.map((value) => Number(value) || 0);
   if (!clean.length) clean.push(0, 0);
   if (clean.length === 1) clean.unshift(0);
-  const width = 240;
-  const height = 72;
-  const pad = 5;
+  const width = 420;
+  const height = 112;
+  const padX = 18;
+  const padTop = 12;
+  const padBottom = 5;
   const max = Math.max(...clean, 1);
   const min = Math.min(...clean, 0);
   const range = Math.max(max - min, 1);
   const points = clean.map((value, index) => {
-    const x = pad + (index / Math.max(clean.length - 1, 1)) * (width - pad * 2);
-    const y = height - pad - ((value - min) / range) * (height - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+    const x = padX + (index / Math.max(clean.length - 1, 1)) * (width - padX * 2);
+    const y = height - padBottom - ((value - min) / range) * (height - padTop - padBottom);
+    return { x, y };
   });
-  const area = `${pad},${height - pad} ${points.join(" ")} ${width - pad},${height - pad}`;
+  const path = smoothChartPath(points);
+  const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${height} L ${points[0].x.toFixed(1)} ${height} Z`;
+  const id = `chartFade${chartId++}`;
   return `
     <svg class="sparkline sparkline-${color}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
-      <polygon class="spark-area" points="${area}"></polygon>
-      <polyline class="spark-path" points="${points.join(" ")}" pathLength="1"></polyline>
-      <circle class="spark-dot" cx="${points.at(-1).split(",")[0]}" cy="${points.at(-1).split(",")[1]}" r="3.5"></circle>
+      <defs>
+        <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="currentColor" stop-opacity="0.30"></stop>
+          <stop offset="58%" stop-color="currentColor" stop-opacity="0.11"></stop>
+          <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
+        </linearGradient>
+      </defs>
+      <g class="chart-grid"><line x1="18" y1="34" x2="402" y2="34"></line><line x1="18" y1="70" x2="402" y2="70"></line><line x1="18" y1="106" x2="402" y2="106"></line></g>
+      <path class="spark-area" d="${areaPath}" fill="url(#${id})"></path>
+      <path class="spark-path" d="${path}" pathLength="1"></path>
+      <circle class="spark-dot" cx="${points.at(-1).x.toFixed(1)}" cy="${points.at(-1).y.toFixed(1)}" r="3.8"></circle>
     </svg>
   `;
 }
 
 function trendValues(field) {
   const rows = Array.isArray(state.trend?.rows) ? state.trend.rows : [];
-  return rows.slice(-14).map((row) => row[field]);
+  return rows.map((row) => row[field]);
 }
 
 function heroMetric(label, valueHtml, note, values, color, icon) {
@@ -303,6 +334,12 @@ function updateTabs() {
   els.tabs.forEach((tab) => {
     tab.classList.toggle("is-active", tab.dataset.page === state.activePage);
   });
+  const activeTab = els.tabs.find((tab) => tab.dataset.page === state.activePage);
+  const indicator = document.querySelector(".tab-indicator");
+  if (activeTab && indicator) {
+    indicator.style.width = `${activeTab.offsetWidth}px`;
+    indicator.style.transform = `translateX(${activeTab.offsetLeft - 3}px)`;
+  }
   els.title.textContent = pages[state.activePage];
 }
 
@@ -331,10 +368,10 @@ function renderOverview() {
 
   setView(`
     <section class="trend-grid" aria-label="Today's performance">
-      ${heroMetric("Today's revenue", money(today?.todayIncl?.earnings), `${cars(today?.todayIncl?.cars)} completed`, revenueTrend, "red", "↗")}
-      ${heroMetric("Cars today", `<span>${formatNumber(today?.todayIncl?.cars)}</span>`, `${moneyText(today?.todayIncl?.earnings)} total revenue`, carsTrend, "blue", "●")}
+      ${heroMetric("Today's revenue", money(today?.todayIncl?.earnings), `${cars(today?.todayIncl?.cars)} completed`, revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`)}
+      ${heroMetric("Cars today", `<span>${formatNumber(today?.todayIncl?.cars)}</span>`, `${moneyText(today?.todayIncl?.earnings)} total revenue`, carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`)}
     </section>
-    <div class="grid">
+    <div class="summary-grid">
       ${board("Today", summaryMetricGroup(today, false))}
       ${board("Yesterday", summaryMetricGroup(yesterday, false))}
       ${board("This Month", `
@@ -537,8 +574,9 @@ function renderCompanyChart(rows, total) {
     const value = Number(company.monthlyCars) || 0;
     const percentage = (value / total.monthlyCars) * 100;
     const color = colors[index % colors.length];
-    const segment = `<circle class="donut-segment" cx="50" cy="50" r="41" pathLength="100" style="--segment:${Math.max(percentage - 0.7, 0).toFixed(2)};--offset:${(-offset).toFixed(2)};--delay:${index * 85}ms;--segment-color:${color}"></circle>`;
+    const start = offset;
     offset += percentage;
+    const segment = `<path class="donut-segment" d="${donutSegmentPath(start, offset)}" style="--delay:${index * 70}ms;--segment-color:${color}"></path>`;
     return { segment, name, company, percentage, color };
   });
 
@@ -546,7 +584,7 @@ function renderCompanyChart(rows, total) {
     <section class="company-chart card">
       <div class="donut-wrap">
         <svg class="company-donut" viewBox="0 0 100 100" role="img" aria-label="Company share by cars this month">
-          <circle class="donut-track" cx="50" cy="50" r="41" pathLength="100"></circle>
+          <circle class="donut-track" cx="50" cy="50" r="42"></circle>
           ${segments.map((item) => item.segment).join("")}
         </svg>
         <div class="donut-center"><strong>${formatNumber(total.monthlyCars)}</strong><span>cars this month</span></div>
@@ -562,6 +600,31 @@ function renderCompanyChart(rows, total) {
       </div>
     </section>
   `;
+}
+
+function donutPoint(percent, radius) {
+  const angle = (percent / 100) * Math.PI * 2 - Math.PI / 2;
+  return { x: 50 + radius * Math.cos(angle), y: 50 + radius * Math.sin(angle) };
+}
+
+function donutSegmentPath(startPercent, endPercent) {
+  const gap = Math.min(0.45, Math.max((endPercent - startPercent) * 0.08, 0.08));
+  const start = startPercent + gap;
+  const end = endPercent - gap;
+  const outerRadius = 44;
+  const innerRadius = 31;
+  const outerStart = donutPoint(start, outerRadius);
+  const outerEnd = donutPoint(end, outerRadius);
+  const innerEnd = donutPoint(end, innerRadius);
+  const innerStart = donutPoint(start, innerRadius);
+  const largeArc = end - start > 50 ? 1 : 0;
+  return [
+    `M ${outerStart.x.toFixed(2)} ${outerStart.y.toFixed(2)}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)} ${outerEnd.y.toFixed(2)}`,
+    `L ${innerEnd.x.toFixed(2)} ${innerEnd.y.toFixed(2)}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x.toFixed(2)} ${innerStart.y.toFixed(2)}`,
+    "Z",
+  ].join(" ");
 }
 
 function employeeOptions() {
@@ -680,13 +743,12 @@ function renderEmployeeLookupResult() {
         </div>
       `)}
     </div>
-    ${renderEmployeeBreakdown("Company Work", result.companies, "No company work recorded for this month.")}
-    ${renderEmployeeBreakdown("Services", result.services, "No service activity recorded for this month.")}
-    ${renderEmployeeBreakdown("Oil Activity", result.oils, "No oil activity recorded for this month.")}
+    ${Object.prototype.hasOwnProperty.call(result, "companies") ? renderEmployeeBreakdown("Company Work", result.companies, "No company work recorded for this month.") : ""}
+    ${Object.prototype.hasOwnProperty.call(result, "services") ? renderEmployeeBreakdown("Services", result.services, "No service activity recorded for this month.") : ""}
+    ${Object.prototype.hasOwnProperty.call(result, "oils") ? renderEmployeeBreakdown("Oil Activity", result.oils, "No oil activity recorded for this month.") : ""}
     <div class="divider">Monthly Breakdown</div>
     ${renderDailyBreakdown(result.dailyBreakdown, result)}
-    <div class="divider">Recent Activity</div>
-    ${renderRecentActivity(result.recentActivity)}
+    ${Object.prototype.hasOwnProperty.call(result, "recentActivity") ? `<div class="divider">Recent Activity</div>${renderRecentActivity(result.recentActivity)}` : ""}
   `;
 }
 
@@ -975,6 +1037,8 @@ function bindEvents() {
       document.getElementById("employeePickerButton")?.setAttribute("aria-expanded", "false");
     }
   });
+
+  window.addEventListener("resize", updateTabs, { passive: true });
 }
 
 function boot() {
@@ -985,6 +1049,7 @@ function boot() {
   mountSplash();
   bindEvents();
   updateTabs();
+  document.fonts?.ready.then(updateTabs);
   refreshData();
 }
 

@@ -269,6 +269,7 @@ body.light .theme-toggle .sun-icon {
 }
 
 .tabs-scroll {
+  position: relative;
   display: flex;
   gap: 8px;
   overflow-x: auto;
@@ -286,6 +287,8 @@ body.light .theme-toggle .sun-icon {
 }
 
 .tab {
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   min-height: 42px;
   border: 1px solid var(--line);
@@ -1087,7 +1090,7 @@ body.light::after {
 .tab.is-active,
 :root.light .tab.is-active,
 body.light .tab.is-active {
-  background: color-mix(in srgb, var(--text) 12%, transparent);
+  background: transparent;
   color: var(--text);
   border-color: transparent;
   box-shadow: none;
@@ -1095,9 +1098,26 @@ body.light .tab.is-active {
 
 :root.light .tab.is-active,
 body.light .tab.is-active {
-  background: #fff;
+  background: transparent;
   color: #15161a;
 }
+
+.tab-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: 0;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  transition: transform 340ms cubic-bezier(.22,.8,.22,1), width 340ms cubic-bezier(.22,.8,.22,1);
+  pointer-events: none;
+}
+
+:root.light .tab-indicator,
+body.light .tab-indicator { background: #fff; }
 
 .page-head h1 {
   letter-spacing: -0.045em;
@@ -1121,7 +1141,7 @@ body.light .tab.is-active {
 
 .trend-card {
   position: relative;
-  min-height: 184px;
+  min-height: 230px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -1148,6 +1168,16 @@ body.light .tab.is-active {
   font-weight: 700;
 }
 
+.trend-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .trend-red .trend-icon { background: linear-gradient(145deg, #ff655c, #e51e18); }
 .trend-blue .trend-icon { background: linear-gradient(145deg, #69b8ff, #3979f6); }
 
@@ -1172,15 +1202,16 @@ body.light .tab.is-active {
 
 .sparkline {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: 0;
-  width: 58%;
-  height: 76px;
+  width: 100%;
+  height: 118px;
   overflow: visible;
 }
 
 .spark-path {
   fill: none;
+  stroke: currentColor;
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1190,12 +1221,20 @@ body.light .tab.is-active {
   animation: drawSpark 850ms 160ms cubic-bezier(.2,.75,.2,1) forwards;
 }
 
-.spark-area { opacity: 0.14; }
-.trend-red .spark-path, .trend-red .spark-dot { stroke: var(--brand-red-bright); fill: var(--brand-red-bright); }
-.trend-red .spark-area { fill: var(--brand-red); }
-.trend-blue .spark-path, .trend-blue .spark-dot { stroke: var(--chart-blue); fill: var(--chart-blue); }
-.trend-blue .spark-area { fill: var(--chart-blue); }
-.spark-dot { opacity: 0; animation: dotIn 260ms 940ms ease forwards; }
+.sparkline-red { color: var(--brand-red-bright); }
+.sparkline-blue { color: var(--chart-blue); }
+.spark-area { opacity: 1; }
+.spark-dot { fill: currentColor; stroke: var(--surface); stroke-width: 2; opacity: 0; animation: dotIn 260ms 940ms ease forwards; }
+
+.chart-grid line {
+  stroke: currentColor;
+  stroke-width: 0.65;
+  opacity: 0.09;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-grid line:nth-child(2) { opacity: 0.055; }
+.chart-grid line:nth-child(3) { opacity: 0.018; }
 
 @keyframes drawSpark { to { stroke-dashoffset: 0; } }
 @keyframes dotIn { to { opacity: 1; } }
@@ -1209,6 +1248,12 @@ body.light .tab.is-active {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .compact-select {
@@ -1385,25 +1430,22 @@ body.light .tab.is-active {
   transform: rotate(-90deg);
 }
 
-.donut-track,
-.donut-segment {
-  fill: none;
-  stroke-width: 11;
-}
+.donut-track { fill: none; stroke-width: 13; }
 
 .donut-track { stroke: color-mix(in srgb, var(--surface-3) 68%, transparent); }
 
 .donut-segment {
-  stroke: var(--segment-color);
-  stroke-linecap: round;
-  stroke-dasharray: 0 100;
-  stroke-dashoffset: var(--offset);
+  fill: var(--segment-color);
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--segment-color) 62%, transparent));
-  animation: donutIn 850ms var(--delay) cubic-bezier(.2,.78,.2,1) forwards;
+  opacity: 0;
+  transform: scale(0.94);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: donutIn 520ms var(--delay) cubic-bezier(.2,.78,.2,1) forwards;
 }
 
 @keyframes donutIn {
-  to { stroke-dasharray: var(--segment) calc(100 - var(--segment)); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .donut-center {
@@ -1454,6 +1496,14 @@ body.light .tab.is-active {
   box-shadow: none;
 }
 
+.search-form { align-items: stretch; }
+.search-input { min-width: 0; }
+.search-button {
+  min-width: 150px;
+  padding-inline: 22px;
+  white-space: nowrap;
+}
+
 .splash {
   transition-duration: 240ms, 300ms;
 }
@@ -1476,8 +1526,9 @@ body.light .tab.is-active {
   html::before { position: absolute; min-height: 140vh; }
 
   .trend-grid { grid-template-columns: 1fr; }
-  .trend-card { min-height: 168px; }
-  .sparkline { width: 64%; }
+  .trend-card { min-height: 220px; }
+  .sparkline { width: 100%; height: 112px; }
+  .summary-grid { grid-template-columns: 1fr; }
 
   .employee-row {
     grid-template-columns: minmax(0, 1.3fr) minmax(110px, 0.7fr);
@@ -1498,7 +1549,7 @@ body.light .tab.is-active {
   .employee-row { grid-template-columns: minmax(0, 1fr) minmax(104px, 0.7fr); gap: 8px; }
   .employee-stat:nth-of-type(2) { display: none; }
   .search-form { display: grid; }
-  .search-button { min-height: 46px; }
+  .search-button { width: 100%; min-height: 48px; }
   .breakdown-row, .activity-row { align-items: flex-start; }
 }
 
@@ -1513,5 +1564,5 @@ body.light .tab.is-active {
 
   .spark-path { stroke-dashoffset: 0; }
   .spark-dot { opacity: 1; }
-  .donut-segment { stroke-dasharray: var(--segment) calc(100 - var(--segment)); }
+  .donut-segment { opacity: 1; transform: scale(1); }
 }

@@ -1141,7 +1141,7 @@ body.light .tab-indicator { background: #fff; }
 
 .trend-card {
   position: relative;
-  min-height: 230px;
+  min-height: 250px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -1154,7 +1154,36 @@ body.light .tab-indicator { background: #fff; }
 .trend-card-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 9px;
+}
+
+.trend-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.trend-change {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--good) 13%, transparent);
+  color: var(--good);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.trend-change.down {
+  background: color-mix(in srgb, var(--bad) 13%, transparent);
+  color: var(--bad);
+}
+
+.trend-change.flat {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
 }
 
 .trend-icon {
@@ -1205,7 +1234,7 @@ body.light .tab-indicator { background: #fff; }
   left: 0;
   bottom: 0;
   width: 100%;
-  height: 118px;
+  height: 142px;
   overflow: visible;
 }
 
@@ -1226,6 +1255,16 @@ body.light .tab-indicator { background: #fff; }
 .spark-area { opacity: 1; }
 .spark-dot { fill: currentColor; stroke: var(--surface); stroke-width: 2; opacity: 0; animation: dotIn 260ms 940ms ease forwards; }
 
+.spark-pulse {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chartPulse 1.8s 900ms ease-out infinite;
+}
+
 .chart-grid line {
   stroke: currentColor;
   stroke-width: 0.65;
@@ -1236,8 +1275,20 @@ body.light .tab-indicator { background: #fff; }
 .chart-grid line:nth-child(2) { opacity: 0.055; }
 .chart-grid line:nth-child(3) { opacity: 0.018; }
 
+.chart-axis text {
+  fill: var(--muted);
+  font-family: Inter, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.78;
+}
+
 @keyframes drawSpark { to { stroke-dashoffset: 0; } }
 @keyframes dotIn { to { opacity: 1; } }
+@keyframes chartPulse {
+  0% { opacity: 0.48; transform: scale(0.6); }
+  70%, 100% { opacity: 0; transform: scale(1.65); }
+}
 
 .section-tools {
   display: flex;
@@ -1526,8 +1577,9 @@ body.light .tab-indicator { background: #fff; }
   html::before { position: absolute; min-height: 140vh; }
 
   .trend-grid { grid-template-columns: 1fr; }
-  .trend-card { min-height: 220px; }
-  .sparkline { width: 100%; height: 112px; }
+  .trend-card { min-height: 238px; }
+  .sparkline { width: 100%; height: 132px; }
+  .trend-change { font-size: 11px; padding: 4px 7px; }
   .summary-grid { grid-template-columns: 1fr; }
 
   .employee-row {
@@ -1556,6 +1608,7 @@ body.light .tab-indicator { background: #fff; }
 @media (prefers-reduced-motion: reduce) {
   .spark-path,
   .spark-dot,
+  .spark-pulse,
   .trend-card,
   .loading-spinner,
   .donut-segment {
@@ -1564,5 +1617,6 @@ body.light .tab-indicator { background: #fff; }
 
   .spark-path { stroke-dashoffset: 0; }
   .spark-dot { opacity: 1; }
+  .spark-pulse { opacity: 0; }
   .donut-segment { opacity: 1; transform: scale(1); }
 }

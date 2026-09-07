@@ -184,42 +184,26 @@ function metric(label, amount, count) {
 
 let chartId = 0;
 
-function smoothChartPath(points) {
-  if (points.length < 2) return `M ${points[0]?.x || 0} ${points[0]?.y || 0}`;
-  let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  for (let index = 0; index < points.length - 1; index++) {
-    const p0 = points[Math.max(0, index - 1)];
-    const p1 = points[index];
-    const p2 = points[index + 1];
-    const p3 = points[Math.min(points.length - 1, index + 2)];
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-  }
-  return path;
-}
-
-function sparkline(values, color = "red") {
-  const clean = values.map((value) => Number(value) || 0);
-  if (!clean.length) clean.push(0, 0);
-  if (clean.length === 1) clean.unshift(0);
+function sparkline(rows, color = "red") {
+  const daysInMonth = Math.max(28, Number(state.trend?.daysInMonth) || 31);
+  const clean = rows.map((row) => ({ day: Number(row.day) || 1, value: Number(row.value) || 0 }));
+  if (!clean.length) clean.push({ day: 1, value: 0 });
   const width = 420;
-  const height = 112;
+  const height = 142;
   const padX = 18;
-  const padTop = 12;
-  const padBottom = 5;
-  const max = Math.max(...clean, 1);
-  const min = Math.min(...clean, 0);
+  const padTop = 28;
+  const graphBottom = 108;
+  const max = Math.max(...clean.map((row) => row.value), 1);
+  const min = Math.min(...clean.map((row) => row.value), 0);
   const range = Math.max(max - min, 1);
-  const points = clean.map((value, index) => {
-    const x = padX + (index / Math.max(clean.length - 1, 1)) * (width - padX * 2);
-    const y = height - padBottom - ((value - min) / range) * (height - padTop - padBottom);
+  const points = clean.map((row) => {
+    const x = padX + ((row.day - 1) / Math.max(daysInMonth - 1, 1)) * (width - padX * 2);
+    const y = graphBottom - ((row.value - min) / range) * (graphBottom - padTop);
     return { x, y };
   });
-  const path = smoothChartPath(points);
-  const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${height} L ${points[0].x.toFixed(1)} ${height} Z`;
+  const path = points.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${graphBottom} L ${points[0].x.toFixed(1)} ${graphBottom} Z`;
+  const axisDays = Array.from(new Set([1, 8, 16, 24, daysInMonth])).filter((day) => day <= daysInMonth);
   const id = `chartFade${chartId++}`;
   return `
     <svg class="sparkline sparkline-${color}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
@@ -230,25 +214,44 @@ function sparkline(values, color = "red") {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
-      <g class="chart-grid"><line x1="18" y1="34" x2="402" y2="34"></line><line x1="18" y1="70" x2="402" y2="70"></line><line x1="18" y1="106" x2="402" y2="106"></line></g>
+      <g class="chart-grid"><line x1="18" y1="35" x2="402" y2="35"></line><line x1="18" y1="71" x2="402" y2="71"></line><line x1="18" y1="108" x2="402" y2="108"></line></g>
       <path class="spark-area" d="${areaPath}" fill="url(#${id})"></path>
       <path class="spark-path" d="${path}" pathLength="1"></path>
+      <circle class="spark-pulse" cx="${points.at(-1).x.toFixed(1)}" cy="${points.at(-1).y.toFixed(1)}" r="8"></circle>
       <circle class="spark-dot" cx="${points.at(-1).x.toFixed(1)}" cy="${points.at(-1).y.toFixed(1)}" r="3.8"></circle>
+      <g class="chart-axis">${axisDays.map((day) => {
+        const x = padX + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (width - padX * 2);
+        return `<text x="${x.toFixed(1)}" y="135" text-anchor="${day === 1 ? "start" : day === daysInMonth ? "end" : "middle"}">${day}</text>`;
+      }).join("")}</g>
     </svg>
   `;
 }
 
 function trendValues(field) {
   const rows = Array.isArray(state.trend?.rows) ? state.trend.rows : [];
-  return rows.map((row) => row[field]);
+  return rows.map((row) => ({ day: row.day, value: row[field] }));
+}
+
+function trendChange(rows) {
+  if (rows.length < 2) return { text: "No prior day", direction: "flat" };
+  const first = Number(rows[0].value) || 0;
+  const last = Number(rows.at(-1).value) || 0;
+  const delta = last - first;
+  const percentage = first ? Math.round((delta / Math.abs(first)) * 100) : 0;
+  const sign = delta > 0 ? "+" : "";
+  return {
+    text: `${delta >= 0 ? "↑" : "↓"} ${sign}${formatNumber(delta)} (${sign}${percentage}%)`,
+    direction: delta > 0 ? "up" : delta < 0 ? "down" : "flat",
+  };
 }
 
 function heroMetric(label, valueHtml, note, values, color, icon) {
+  const change = trendChange(values);
   return `
     <article class="trend-card trend-${color}">
       <div class="trend-card-head">
-        <span class="trend-icon" aria-hidden="true">${icon}</span>
-        <span class="metric-label">${escapeHtml(label)}</span>
+        <span class="trend-title"><span class="trend-icon" aria-hidden="true">${icon}</span><span class="metric-label">${escapeHtml(label)}</span></span>
+        <span class="trend-change ${change.direction}">${escapeHtml(change.text)}</span>
       </div>
       <div class="trend-value">${valueHtml}</div>
       <div class="trend-note">${escapeHtml(note)}</div>

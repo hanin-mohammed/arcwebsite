@@ -190,23 +190,28 @@ function sparkline(rows, color = "red") {
   if (!clean.length) clean.push({ day: 1, value: 0 });
   const width = 420;
   const height = 142;
-  const padX = 18;
+  const plotLeft = 48;
+  const plotRight = 402;
   const padTop = 28;
   const graphBottom = 108;
   const max = Math.max(...clean.map((row) => row.value), 1);
   const min = Math.min(...clean.map((row) => row.value), 0);
   const range = Math.max(max - min, 1);
   const points = clean.map((row) => {
-    const x = padX + ((row.day - 1) / Math.max(daysInMonth - 1, 1)) * (width - padX * 2);
+    const x = plotLeft + ((row.day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
     const y = graphBottom - ((row.value - min) / range) * (graphBottom - padTop);
     return { x, y };
   });
   const path = points.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
   const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${graphBottom} L ${points[0].x.toFixed(1)} ${graphBottom} Z`;
   const axisDays = Array.from(new Set([1, 8, 16, 24, daysInMonth])).filter((day) => day <= daysInMonth);
+  const yMarkers = [max, min + range / 2, min];
+  const markerLeft = (points.at(-1).x / width) * 100;
+  const markerTop = (points.at(-1).y / height) * 100;
   const id = `chartFade${chartId++}`;
   return `
-    <svg class="sparkline sparkline-${color}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
+    <div class="sparkline-wrap sparkline-${color}" aria-hidden="true">
+    <svg class="sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
       <defs>
         <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="currentColor" stop-opacity="0.30"></stop>
@@ -214,17 +219,26 @@ function sparkline(rows, color = "red") {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
-      <g class="chart-grid"><line x1="18" y1="35" x2="402" y2="35"></line><line x1="18" y1="71" x2="402" y2="71"></line><line x1="18" y1="108" x2="402" y2="108"></line></g>
+      <g class="chart-grid"><line x1="48" y1="35" x2="402" y2="35"></line><line x1="48" y1="71" x2="402" y2="71"></line><line x1="48" y1="108" x2="402" y2="108"></line></g>
       <path class="spark-area" d="${areaPath}" fill="url(#${id})"></path>
       <path class="spark-path" d="${path}" pathLength="1"></path>
-      <circle class="spark-pulse" cx="${points.at(-1).x.toFixed(1)}" cy="${points.at(-1).y.toFixed(1)}" r="8"></circle>
-      <circle class="spark-dot" cx="${points.at(-1).x.toFixed(1)}" cy="${points.at(-1).y.toFixed(1)}" r="3.8"></circle>
+      <g class="chart-y-axis">${yMarkers.map((value, index) => `<text x="18" y="${[38, 74, 111][index]}">${compactAxisValue(value)}</text>`).join("")}</g>
       <g class="chart-axis">${axisDays.map((day) => {
-        const x = padX + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (width - padX * 2);
+        const x = plotLeft + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
         return `<text x="${x.toFixed(1)}" y="135" text-anchor="${day === 1 ? "start" : day === daysInMonth ? "end" : "middle"}">${day}</text>`;
       }).join("")}</g>
     </svg>
+    <span class="chart-marker" style="left:${markerLeft.toFixed(2)}%;top:${markerTop.toFixed(2)}%"><i></i></span>
+    </div>
   `;
+}
+
+function compactAxisValue(value) {
+  const number = Number(value) || 0;
+  if (Math.abs(number) >= 1000) {
+    return `${(number / 1000).toFixed(number % 1000 === 0 ? 0 : 1)}k`;
+  }
+  return formatNumber(number);
 }
 
 function trendValues(field) {
@@ -371,8 +385,8 @@ function renderOverview() {
 
   setView(`
     <section class="trend-grid" aria-label="Today's performance">
-      ${heroMetric("Today's revenue", money(today?.todayIncl?.earnings), `${cars(today?.todayIncl?.cars)} completed`, revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`)}
-      ${heroMetric("Cars today", `<span>${formatNumber(today?.todayIncl?.cars)}</span>`, `${moneyText(today?.todayIncl?.earnings)} total revenue`, carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`)}
+      ${heroMetric("Today's revenue", money(today?.todayIncl?.earnings), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`)}
+      ${heroMetric("Cars today", `<span>${formatNumber(today?.todayIncl?.cars)}</span>`, monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`)}
     </section>
     <div class="summary-grid">
       ${board("Today", summaryMetricGroup(today, false))}

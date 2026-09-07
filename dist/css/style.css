@@ -1229,12 +1229,17 @@ body.light .tab-indicator { background: #fff; }
   font-weight: 600;
 }
 
-.sparkline {
+.sparkline-wrap {
   position: absolute;
   left: 0;
   bottom: 0;
   width: 100%;
   height: 142px;
+}
+
+.sparkline {
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 
@@ -1253,16 +1258,33 @@ body.light .tab-indicator { background: #fff; }
 .sparkline-red { color: var(--brand-red-bright); }
 .sparkline-blue { color: var(--chart-blue); }
 .spark-area { opacity: 1; }
-.spark-dot { fill: currentColor; stroke: var(--surface); stroke-width: 2; opacity: 0; animation: dotIn 260ms 940ms ease forwards; }
+.chart-marker {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid color-mix(in srgb, currentColor 34%, transparent);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
 
-.spark-pulse {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: chartPulse 1.8s 900ms ease-out infinite;
+.chart-marker i {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px currentColor;
+}
+
+.chart-marker::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  animation: chartPulse 1.8s 700ms ease-out infinite;
 }
 
 .chart-grid line {
@@ -1275,7 +1297,8 @@ body.light .tab-indicator { background: #fff; }
 .chart-grid line:nth-child(2) { opacity: 0.055; }
 .chart-grid line:nth-child(3) { opacity: 0.018; }
 
-.chart-axis text {
+.chart-axis text,
+.chart-y-axis text {
   fill: var(--muted);
   font-family: Inter, sans-serif;
   font-size: 9px;
@@ -1283,8 +1306,12 @@ body.light .tab-indicator { background: #fff; }
   opacity: 0.78;
 }
 
+.chart-y-axis text {
+  font-size: 8px;
+  opacity: 0.58;
+}
+
 @keyframes drawSpark { to { stroke-dashoffset: 0; } }
-@keyframes dotIn { to { opacity: 1; } }
 @keyframes chartPulse {
   0% { opacity: 0.48; transform: scale(0.6); }
   70%, 100% { opacity: 0; transform: scale(1.65); }
@@ -1578,7 +1605,7 @@ body.light .tab-indicator { background: #fff; }
 
   .trend-grid { grid-template-columns: 1fr; }
   .trend-card { min-height: 238px; }
-  .sparkline { width: 100%; height: 132px; }
+  .sparkline-wrap { width: 100%; height: 132px; }
   .trend-change { font-size: 11px; padding: 4px 7px; }
   .summary-grid { grid-template-columns: 1fr; }
 
@@ -1607,8 +1634,7 @@ body.light .tab-indicator { background: #fff; }
 
 @media (prefers-reduced-motion: reduce) {
   .spark-path,
-  .spark-dot,
-  .spark-pulse,
+  .chart-marker::after,
   .trend-card,
   .loading-spinner,
   .donut-segment {
@@ -1616,7 +1642,6 @@ body.light .tab-indicator { background: #fff; }
   }
 
   .spark-path { stroke-dashoffset: 0; }
-  .spark-dot { opacity: 1; }
-  .spark-pulse { opacity: 0; }
+  .chart-marker::after { opacity: 0; }
   .donut-segment { opacity: 1; transform: scale(1); }
 }

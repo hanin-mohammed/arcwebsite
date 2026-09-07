@@ -224,12 +224,12 @@ function sparkline(rows, color = "red") {
       </defs>
       <g class="chart-grid"><line x1="48" y1="30" x2="402" y2="30"></line><line x1="48" y1="82" x2="402" y2="82"></line><line x1="48" y1="136" x2="402" y2="136"></line></g>
       <g class="chart-series"><path class="spark-area" d="${areaPath}" fill="url(#${id})"></path><path class="spark-path" d="${path}"></path></g>
-      <g class="chart-y-axis">${yMarkers.map((value, index) => `<text x="18" y="${[33, 85, 139][index]}">${compactAxisValue(value)}</text>`).join("")}</g>
-      <g class="chart-axis">${axisDays.map((day) => {
-        const x = plotLeft + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
-        return `<text x="${x.toFixed(1)}" y="163" text-anchor="${day === 1 ? "start" : day === daysInMonth ? "end" : "middle"}">${day}</text>`;
-      }).join("")}</g>
     </svg>
+    <span class="chart-y-labels">${yMarkers.map((value, index) => `<b style="top:${([30, 82, 136][index] / height * 100).toFixed(2)}%">${compactAxisValue(value)}</b>`).join("")}</span>
+    <span class="chart-x-labels">${axisDays.map((day) => {
+      const x = plotLeft + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
+      return `<b class="${day === 1 ? "first" : day === daysInMonth ? "last" : ""}" style="left:${(x / width * 100).toFixed(2)}%">${day}</b>`;
+    }).join("")}</span>
     <span class="chart-marker" style="left:${markerLeft.toFixed(2)}%;top:${markerTop.toFixed(2)}%"><i></i></span>
     </div>
   `;

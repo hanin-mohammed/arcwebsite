@@ -189,13 +189,16 @@ function sparkline(rows, color = "red") {
   const clean = rows.map((row) => ({ day: Number(row.day) || 1, value: Number(row.value) || 0 }));
   if (!clean.length) clean.push({ day: 1, value: 0 });
   const width = 420;
-  const height = 142;
+  const height = 170;
   const plotLeft = 48;
   const plotRight = 402;
-  const padTop = 28;
-  const graphBottom = 108;
-  const max = Math.max(...clean.map((row) => row.value), 1);
-  const min = Math.min(...clean.map((row) => row.value), 0);
+  const padTop = 24;
+  const graphBottom = 136;
+  const rawMax = Math.max(...clean.map((row) => row.value), 1);
+  const rawMin = Math.min(...clean.map((row) => row.value));
+  const domain = standardChartDomain(rawMin, rawMax);
+  const max = domain.max;
+  const min = domain.min;
   const range = Math.max(max - min, 1);
   const points = clean.map((row) => {
     const x = plotLeft + ((row.day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
@@ -205,7 +208,7 @@ function sparkline(rows, color = "red") {
   const path = points.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
   const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${graphBottom} L ${points[0].x.toFixed(1)} ${graphBottom} Z`;
   const axisDays = Array.from(new Set([1, 8, 16, 24, daysInMonth])).filter((day) => day <= daysInMonth);
-  const yMarkers = [max, min + range / 2, min];
+  const yMarkers = domain.ticks;
   const markerLeft = (points.at(-1).x / width) * 100;
   const markerTop = (points.at(-1).y / height) * 100;
   const id = `chartFade${chartId++}`;
@@ -219,18 +222,37 @@ function sparkline(rows, color = "red") {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
-      <g class="chart-grid"><line x1="48" y1="35" x2="402" y2="35"></line><line x1="48" y1="71" x2="402" y2="71"></line><line x1="48" y1="108" x2="402" y2="108"></line></g>
-      <path class="spark-area" d="${areaPath}" fill="url(#${id})"></path>
-      <path class="spark-path" d="${path}" pathLength="1"></path>
-      <g class="chart-y-axis">${yMarkers.map((value, index) => `<text x="18" y="${[38, 74, 111][index]}">${compactAxisValue(value)}</text>`).join("")}</g>
+      <g class="chart-grid"><line x1="48" y1="30" x2="402" y2="30"></line><line x1="48" y1="82" x2="402" y2="82"></line><line x1="48" y1="136" x2="402" y2="136"></line></g>
+      <g class="chart-series"><path class="spark-area" d="${areaPath}" fill="url(#${id})"></path><path class="spark-path" d="${path}"></path></g>
+      <g class="chart-y-axis">${yMarkers.map((value, index) => `<text x="18" y="${[33, 85, 139][index]}">${compactAxisValue(value)}</text>`).join("")}</g>
       <g class="chart-axis">${axisDays.map((day) => {
         const x = plotLeft + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
-        return `<text x="${x.toFixed(1)}" y="135" text-anchor="${day === 1 ? "start" : day === daysInMonth ? "end" : "middle"}">${day}</text>`;
+        return `<text x="${x.toFixed(1)}" y="163" text-anchor="${day === 1 ? "start" : day === daysInMonth ? "end" : "middle"}">${day}</text>`;
       }).join("")}</g>
     </svg>
     <span class="chart-marker" style="left:${markerLeft.toFixed(2)}%;top:${markerTop.toFixed(2)}%"><i></i></span>
     </div>
   `;
+}
+
+function standardChartDomain(rawMin, rawMax) {
+  const span = Math.max(rawMax - rawMin, rawMax * 0.08, 1);
+  const roughStep = span / 2;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  let factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  let step = factor * magnitude;
+  let min = Math.max(0, Math.floor(rawMin / step) * step);
+  let max = min + step * 2;
+
+  if (max < rawMax) {
+    factor = factor === 1 ? 2 : factor === 2 ? 5 : factor === 5 ? 10 : 20;
+    step = factor * magnitude;
+    min = Math.max(0, Math.floor(rawMin / step) * step);
+    max = min + step * 2;
+  }
+
+  return { min, max, ticks: [max, min + step, min] };
 }
 
 function compactAxisValue(value) {

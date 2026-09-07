@@ -1141,7 +1141,7 @@ body.light .tab-indicator { background: #fff; }
 
 .trend-card {
   position: relative;
-  min-height: 250px;
+  min-height: 280px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -1234,7 +1234,7 @@ body.light .tab-indicator { background: #fff; }
   left: 0;
   bottom: 0;
   width: 100%;
-  height: 142px;
+  height: 170px;
 }
 
 .sparkline {
@@ -1250,9 +1250,11 @@ body.light .tab-indicator { background: #fff; }
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: drawSpark 850ms 160ms cubic-bezier(.2,.75,.2,1) forwards;
+}
+
+.chart-series {
+  clip-path: inset(0 100% 0 0);
+  animation: revealChart 520ms 100ms cubic-bezier(.2,.75,.2,1) forwards;
 }
 
 .sparkline-red { color: var(--brand-red-bright); }
@@ -1265,6 +1267,8 @@ body.light .tab-indicator { background: #fff; }
   border: 2px solid color-mix(in srgb, currentColor 34%, transparent);
   border-radius: 50%;
   transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: markerIn 180ms 600ms ease forwards;
 }
 
 .chart-marker i {
@@ -1311,7 +1315,8 @@ body.light .tab-indicator { background: #fff; }
   opacity: 0.58;
 }
 
-@keyframes drawSpark { to { stroke-dashoffset: 0; } }
+@keyframes revealChart { to { clip-path: inset(0 0 0 0); } }
+@keyframes markerIn { to { opacity: 1; } }
 @keyframes chartPulse {
   0% { opacity: 0.48; transform: scale(0.6); }
   70%, 100% { opacity: 0; transform: scale(1.65); }
@@ -1604,8 +1609,8 @@ body.light .tab-indicator { background: #fff; }
   html::before { position: absolute; min-height: 140vh; }
 
   .trend-grid { grid-template-columns: 1fr; }
-  .trend-card { min-height: 238px; }
-  .sparkline-wrap { width: 100%; height: 132px; }
+  .trend-card { min-height: 258px; }
+  .sparkline-wrap { width: 100%; height: 150px; }
   .trend-change { font-size: 11px; padding: 4px 7px; }
   .summary-grid { grid-template-columns: 1fr; }
 
@@ -1633,7 +1638,7 @@ body.light .tab-indicator { background: #fff; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spark-path,
+  .chart-series,
   .chart-marker::after,
   .trend-card,
   .loading-spinner,
@@ -1643,5 +1648,7 @@ body.light .tab-indicator { background: #fff; }
 
   .spark-path { stroke-dashoffset: 0; }
   .chart-marker::after { opacity: 0; }
+  .chart-marker { opacity: 1; }
+  .chart-series { clip-path: none; }
   .donut-segment { opacity: 1; transform: scale(1); }
 }

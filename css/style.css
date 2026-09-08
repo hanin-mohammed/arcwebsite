@@ -1231,10 +1231,10 @@ body.light .tab-indicator { background: #fff; }
 
 .sparkline-wrap {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 170px;
+  right: 16px;
+  bottom: 14px;
+  width: min(56%, 310px);
+  height: 104px;
 }
 
 .sparkline {
@@ -1246,10 +1246,11 @@ body.light .tab-indicator { background: #fff; }
 .spark-path {
   fill: none;
   stroke: currentColor;
-  stroke-width: 3;
+  stroke-width: 3.25;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, currentColor 38%, transparent));
 }
 
 .chart-series {
@@ -1262,85 +1263,30 @@ body.light .tab-indicator { background: #fff; }
 .spark-area { opacity: 1; }
 .chart-marker {
   position: absolute;
-  width: 18px;
-  height: 18px;
-  border: 2px solid color-mix(in srgb, currentColor 34%, transparent);
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, currentColor 46%, transparent);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   opacity: 0;
-  animation: markerIn 180ms 600ms ease forwards;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  box-shadow: 0 0 9px color-mix(in srgb, currentColor 30%, transparent);
+  animation: markerIn 180ms 560ms ease forwards;
 }
 
 .chart-marker i {
   position: absolute;
   inset: 50% auto auto 50%;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 8px currentColor;
+  box-shadow: 0 0 6px currentColor;
 }
-
-.chart-marker::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  animation: chartPulse 1.8s 700ms ease-out infinite;
-}
-
-.chart-grid line {
-  stroke: currentColor;
-  stroke-width: 0.65;
-  opacity: 0.09;
-  vector-effect: non-scaling-stroke;
-}
-
-.chart-grid line:nth-child(2) { opacity: 0.055; }
-.chart-grid line:nth-child(3) { opacity: 0.018; }
-
-.chart-y-labels,
-.chart-x-labels {
-  position: absolute;
-  inset: 0;
-  color: var(--muted);
-  font-family: Inter, sans-serif;
-  font-weight: 700;
-  pointer-events: none;
-}
-
-.chart-y-labels b,
-.chart-x-labels b {
-  position: absolute;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.chart-y-labels b {
-  left: 14px;
-  transform: translateY(-50%);
-  opacity: 0.62;
-}
-
-.chart-x-labels b {
-  bottom: 4px;
-  transform: translateX(-50%);
-  opacity: 0.8;
-}
-
-.chart-x-labels .first { transform: none; }
-.chart-x-labels .last { transform: translateX(-100%); }
 
 @keyframes revealChart { to { clip-path: inset(0 0 0 0); } }
 @keyframes markerIn { to { opacity: 1; } }
-@keyframes chartPulse {
-  0% { opacity: 0.48; transform: scale(0.6); }
-  70%, 100% { opacity: 0; transform: scale(1.65); }
-}
 
 .section-tools {
   display: flex;
@@ -1630,7 +1576,7 @@ body.light .tab-indicator { background: #fff; }
 
   .trend-grid { grid-template-columns: 1fr; }
   .trend-card { min-height: 258px; }
-  .sparkline-wrap { width: 100%; height: 150px; }
+  .sparkline-wrap { right: 14px; bottom: 12px; width: min(64%, 290px); height: 96px; }
   .trend-change { font-size: 11px; padding: 4px 7px; }
   .summary-grid { grid-template-columns: 1fr; }
 
@@ -1650,8 +1596,6 @@ body.light .tab-indicator { background: #fff; }
   .app-shell { padding-left: 12px; padding-right: 12px; }
   .tabs { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
   .trend-card { border-radius: 21px; }
-  .chart-y-labels b,
-  .chart-x-labels b { font-size: 9px; }
   .employee-row { grid-template-columns: minmax(0, 1fr) minmax(104px, 0.7fr); gap: 8px; }
   .employee-stat:nth-of-type(2) { display: none; }
   .search-form { display: grid; }

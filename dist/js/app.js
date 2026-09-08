@@ -184,33 +184,57 @@ function metric(label, amount, count) {
 
 let chartId = 0;
 
+function smoothChartPath(points) {
+  if (points.length === 1) {
+    const point = points[0];
+    return `M ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  }
+
+  return points.slice(0, -1).reduce((path, point, index) => {
+    const previous = points[index - 1] || point;
+    const next = points[index + 1];
+    const afterNext = points[index + 2] || next;
+    const controlOneX = point.x + (next.x - previous.x) / 6;
+    const controlOneY = point.y + (next.y - previous.y) / 6;
+    const controlTwoX = next.x - (afterNext.x - point.x) / 6;
+    const controlTwoY = next.y - (afterNext.y - point.y) / 6;
+
+    return `${path} C ${controlOneX.toFixed(1)} ${controlOneY.toFixed(1)}, ${controlTwoX.toFixed(1)} ${controlTwoY.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
+  }, `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`);
+}
+
 function sparkline(rows, color = "red") {
-  const daysInMonth = Math.max(28, Number(state.trend?.daysInMonth) || 31);
   const clean = rows.map((row) => ({ day: Number(row.day) || 1, value: Number(row.value) || 0 }));
   if (!clean.length) clean.push({ day: 1, value: 0 });
   const width = 420;
-  const height = 170;
-  const plotLeft = 48;
-  const plotRight = 402;
-  const padTop = 24;
-  const graphBottom = 136;
+  const height = 110;
+  const plotLeft = 8;
+  const plotRight = 412;
+  const padTop = 10;
+  const graphBottom = 104;
   const rawMax = Math.max(...clean.map((row) => row.value), 1);
   const rawMin = Math.min(...clean.map((row) => row.value));
-  const domain = standardChartDomain(rawMin, rawMax);
-  const max = domain.max;
-  const min = domain.min;
+  const valueSpan = Math.max(rawMax - rawMin, rawMax * 0.08, 1);
+  const max = rawMax + valueSpan * 0.2;
+  const min = Math.max(0, rawMin - valueSpan * 0.2);
   const range = Math.max(max - min, 1);
+  const firstDay = Math.min(...clean.map((row) => row.day));
+  const lastDay = Math.max(...clean.map((row) => row.day));
+  const dayRange = Math.max(lastDay - firstDay, 1);
   const points = clean.map((row) => {
-    const x = plotLeft + ((row.day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
+    const x = clean.length === 1
+      ? width / 2
+      : plotLeft + ((row.day - firstDay) / dayRange) * (plotRight - plotLeft);
     const y = graphBottom - ((row.value - min) / range) * (graphBottom - padTop);
     return { x, y };
   });
-  const path = points.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const path = smoothChartPath(points);
   const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${graphBottom} L ${points[0].x.toFixed(1)} ${graphBottom} Z`;
-  const axisDays = Array.from(new Set([1, 8, 16, 24, daysInMonth])).filter((day) => day <= daysInMonth);
-  const yMarkers = domain.ticks;
-  const markerLeft = (points.at(-1).x / width) * 100;
-  const markerTop = (points.at(-1).y / height) * 100;
+  const latestIndex = points.length - 1;
+  const peakIndex = clean.reduce((best, row, index) => row.value > clean[best].value ? index : best, 0);
+  const lowIndex = clean.reduce((best, row, index) => row.value < clean[best].value ? index : best, 0);
+  const keyIndex = peakIndex === latestIndex ? lowIndex : peakIndex;
+  const markerIndexes = [...new Set([keyIndex, latestIndex])];
   const id = `chartFade${chartId++}`;
   return `
     <div class="sparkline-wrap sparkline-${color}" aria-hidden="true">
@@ -222,15 +246,13 @@ function sparkline(rows, color = "red") {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
-      <g class="chart-grid"><line x1="48" y1="30" x2="402" y2="30"></line><line x1="48" y1="82" x2="402" y2="82"></line><line x1="48" y1="136" x2="402" y2="136"></line></g>
       <g class="chart-series"><path class="spark-area" d="${areaPath}" fill="url(#${id})"></path><path class="spark-path" d="${path}"></path></g>
     </svg>
-    <span class="chart-y-labels">${yMarkers.map((value, index) => `<b style="top:${([30, 82, 136][index] / height * 100).toFixed(2)}%">${compactAxisValue(value)}</b>`).join("")}</span>
-    <span class="chart-x-labels">${axisDays.map((day) => {
-      const x = plotLeft + ((day - 1) / Math.max(daysInMonth - 1, 1)) * (plotRight - plotLeft);
-      return `<b class="${day === 1 ? "first" : day === daysInMonth ? "last" : ""}" style="left:${(x / width * 100).toFixed(2)}%">${day}</b>`;
-    }).join("")}</span>
-    <span class="chart-marker" style="left:${markerLeft.toFixed(2)}%;top:${markerTop.toFixed(2)}%"><i></i></span>
+    ${markerIndexes.map((index) => {
+      const point = points[index];
+      const markerClass = index === latestIndex ? " latest" : "";
+      return `<span class="chart-marker${markerClass}" style="left:${(point.x / width * 100).toFixed(2)}%;top:${(point.y / height * 100).toFixed(2)}%"><i></i></span>`;
+    }).join("")}
     </div>
   `;
 }

@@ -701,7 +701,7 @@ function renderCompanyChart(rows, total) {
     const color = colors[index % colors.length];
     const start = offset;
     offset += percentage;
-    const segment = `<path class="donut-segment" d="${donutSegmentPath(start, offset)}" style="--delay:${index * 220}ms;--segment-color:${color}"></path>`;
+    const segment = `<path class="donut-segment" d="${donutSegmentPath(start, offset)}" style="--delay:${index * 100}ms;--segment-color:${color}"></path>`;
     return { segment, name, company, percentage, color };
   });
 

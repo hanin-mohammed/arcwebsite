@@ -84,6 +84,33 @@ function money(value) {
   `;
 }
 
+function rollingMetricValue(value, { currency = false, label = "" } = {}) {
+  const formatted = formatNumber(value);
+  let digitIndex = 0;
+  const glyphs = Array.from(formatted).map((character) => {
+    if (!/\d/.test(character)) {
+      return `<span class="rolling-separator">${escapeHtml(character)}</span>`;
+    }
+
+    const digit = Number(character);
+    const previous = (digit + 9) % 10;
+    const order = digitIndex++;
+    return `
+      <span class="rolling-digit" style="--digit-order:${order}">
+        <span class="rolling-digit-track"><span>${previous}</span><span>${digit}</span></span>
+      </span>
+    `;
+  }).join("");
+  const accessibleLabel = label || (currency ? moneyText(value) : formatted);
+
+  return `
+    <span class="rolling-number${currency ? " money" : ""}" aria-label="${escapeHtml(accessibleLabel)}">
+      ${currency ? `<span class="rolling-prefix" aria-hidden="true"><span class="dirham"></span><span class="currency-fallback">AED</span></span>` : ""}
+      <span class="rolling-glyphs" aria-hidden="true">${glyphs}</span>
+    </span>
+  `;
+}
+
 function cars(value) {
   const count = Number(value) || 0;
   return `${count} ${count === 1 ? "car" : "cars"}`;
@@ -211,34 +238,64 @@ function sparkline(rows, color = "red") {
   const plotLeft = 8;
   const plotRight = 412;
   const padTop = 10;
-  const graphBottom = 104;
+  const graphBottom = 84;
   const rawMax = Math.max(...clean.map((row) => row.value), 1);
   const rawMin = Math.min(...clean.map((row) => row.value));
-  const valueSpan = Math.max(rawMax - rawMin, rawMax * 0.08, 1);
-  const max = rawMax + valueSpan * 0.2;
-  const min = Math.max(0, rawMin - valueSpan * 0.2);
+  const domain = standardChartDomain(rawMin, rawMax);
+  const max = domain.max;
+  const min = domain.min;
   const range = Math.max(max - min, 1);
   const firstDay = Math.min(...clean.map((row) => row.day));
   const lastDay = Math.max(...clean.map((row) => row.day));
   const dayRange = Math.max(lastDay - firstDay, 1);
+  const xForDay = (day) => clean.length === 1
+    ? width / 2
+    : plotLeft + ((day - firstDay) / dayRange) * (plotRight - plotLeft);
+  const yForValue = (value) => graphBottom - ((value - min) / range) * (graphBottom - padTop);
   const points = clean.map((row) => {
-    const x = clean.length === 1
-      ? width / 2
-      : plotLeft + ((row.day - firstDay) / dayRange) * (plotRight - plotLeft);
-    const y = graphBottom - ((row.value - min) / range) * (graphBottom - padTop);
-    return { x, y };
+    return { x: xForDay(row.day), y: yForValue(row.value) };
   });
   const path = smoothChartPath(points);
   const areaPath = `${path} L ${points.at(-1).x.toFixed(1)} ${graphBottom} L ${points[0].x.toFixed(1)} ${graphBottom} Z`;
   const latestIndex = points.length - 1;
   const peakIndex = clean.reduce((best, row, index) => row.value > clean[best].value ? index : best, 0);
-  const lowIndex = clean.reduce((best, row, index) => row.value < clean[best].value ? index : best, 0);
-  const keyIndex = peakIndex === latestIndex ? lowIndex : peakIndex;
-  const markerIndexes = [...new Set([keyIndex, latestIndex])];
+  const markerIndexes = [...new Set([peakIndex, latestIndex])];
+  const midpointDay = Math.round((firstDay + lastDay) / 2);
+  const axisDays = [...new Set([firstDay, midpointDay, lastDay])];
+  const yMarkers = domain.ticks;
+  const pointPositions = points.map((point) => (point.x / width) * 100);
+  const hoverTargets = points.map((point, index) => {
+    const pointLeft = pointPositions[index];
+    const zoneStart = index === 0 ? 0 : (pointPositions[index - 1] + pointLeft) / 2;
+    const zoneEnd = index === points.length - 1 ? 100 : (pointLeft + pointPositions[index + 1]) / 2;
+    const pointWithinZone = zoneEnd === zoneStart ? 50 : ((pointLeft - zoneStart) / (zoneEnd - zoneStart)) * 100;
+    const row = clean[index];
+    const valueLabel = color === "red"
+      ? `AED ${formatNumber(row.value)}`
+      : `${formatNumber(row.value)} cars`;
+    const edgeClass = index === 0 ? " edge-start" : index === points.length - 1 ? " edge-end" : "";
+    const peakClass = index === peakIndex ? " is-peak" : "";
+    const pointLabel = index === peakIndex ? `Peak · Day ${row.day}` : `Day ${row.day}`;
+    const ariaLabel = index === peakIndex
+      ? `Peak, day ${row.day}, ${valueLabel}`
+      : `Day ${row.day}, ${valueLabel}`;
+
+    return `
+      <button class="chart-hit${edgeClass}${peakClass}" type="button"
+        style="left:${zoneStart.toFixed(2)}%;width:${(zoneEnd - zoneStart).toFixed(2)}%"
+        aria-label="${escapeHtml(ariaLabel)}">
+        <span class="chart-hover-point" aria-hidden="true"
+          style="left:${pointWithinZone.toFixed(2)}%;top:${(point.y / height * 100).toFixed(2)}%">
+          <i></i>
+          <span class="chart-tooltip"><span>${pointLabel}</span><strong>${escapeHtml(valueLabel)}</strong></span>
+        </span>
+      </button>
+    `;
+  }).join("");
   const id = `chartFade${chartId++}`;
   return `
-    <div class="sparkline-wrap sparkline-${color}" aria-hidden="true">
-    <svg class="sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+    <div class="sparkline-wrap sparkline-${color}">
+    <svg class="sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="currentColor" stop-opacity="0.30"></stop>
@@ -246,13 +303,20 @@ function sparkline(rows, color = "red") {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
+      <g class="chart-grid">${yMarkers.map((value) => {
+        const y = yForValue(value).toFixed(1);
+        return `<line x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}"></line>`;
+      }).join("")}</g>
       <g class="chart-series"><path class="spark-area" d="${areaPath}" fill="url(#${id})"></path><path class="spark-path" d="${path}"></path></g>
     </svg>
+    <span class="chart-y-labels">${yMarkers.map((value) => `<b style="top:${(yForValue(value) / height * 100).toFixed(2)}%">${compactAxisValue(value)}</b>`).join("")}</span>
+    <span class="chart-x-labels">${axisDays.map((day, index) => `<b class="${index === 0 ? "first" : index === axisDays.length - 1 ? "last" : ""}" style="left:${(xForDay(day) / width * 100).toFixed(2)}%">${day}</b>`).join("")}</span>
     ${markerIndexes.map((index) => {
       const point = points[index];
-      const markerClass = index === latestIndex ? " latest" : "";
+      const markerClass = `${index === peakIndex ? " peak" : ""}${index === latestIndex ? " latest" : ""}`;
       return `<span class="chart-marker${markerClass}" style="left:${(point.x / width * 100).toFixed(2)}%;top:${(point.y / height * 100).toFixed(2)}%"><i></i></span>`;
     }).join("")}
+    ${hoverTargets}
     </div>
   `;
 }
@@ -429,8 +493,8 @@ function renderOverview() {
 
   setView(`
     <section class="trend-grid" aria-label="Today's performance">
-      ${heroMetric("Today's revenue", money(today?.todayIncl?.earnings), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`)}
-      ${heroMetric("Cars today", `<span>${formatNumber(today?.todayIncl?.cars)}</span>`, monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`)}
+      ${heroMetric("Today's revenue", rollingMetricValue(today?.todayIncl?.earnings, { currency: true }), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`)}
+      ${heroMetric("Cars today", rollingMetricValue(today?.todayIncl?.cars, { label: `${formatNumber(today?.todayIncl?.cars)} cars today` }), monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`)}
     </section>
     <div class="summary-grid">
       ${board("Today", summaryMetricGroup(today, false))}
@@ -637,7 +701,7 @@ function renderCompanyChart(rows, total) {
     const color = colors[index % colors.length];
     const start = offset;
     offset += percentage;
-    const segment = `<path class="donut-segment" d="${donutSegmentPath(start, offset)}" style="--delay:${index * 70}ms;--segment-color:${color}"></path>`;
+    const segment = `<path class="donut-segment" d="${donutSegmentPath(start, offset)}" style="--delay:${index * 220}ms;--segment-color:${color}"></path>`;
     return { segment, name, company, percentage, color };
   });
 
@@ -714,31 +778,23 @@ function renderEmployeeLookup() {
   setView(`
     <form class="lookup-form" id="employeeLookupForm">
       <div class="form-field">
-        <span class="field-label">Employee</span>
-        <div class="employee-picker" id="employeePicker">
-          <button class="picker-button" id="employeePickerButton" type="button" aria-expanded="false">
-            <span>${lookup.employee ? escapeHtml(lookup.employee) : "Select employee"}</span>
-            <i class="chevron" aria-hidden="true"></i>
-          </button>
-          <div class="picker-panel" id="employeePickerPanel">
-            <input class="picker-search" id="employeePickerSearch" type="search" placeholder="Filter employees" autocomplete="off">
-            <div class="picker-list" id="employeePickerList">
-              ${employees.map((name) => `
-                <button class="picker-option${name === lookup.employee ? " is-selected" : ""}" type="button" data-employee="${escapeHtml(name)}">${escapeHtml(name)}</button>
-              `).join("")}
-            </div>
-          </div>
-        </div>
+        <label class="field-label" for="employeeInput">Employee</label>
+        <select class="select-input" id="employeeInput" aria-label="Employee">
+          <option value="">Select employee</option>
+          ${employees.map((name) => `<option value="${escapeHtml(name)}"${name === lookup.employee ? " selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+        </select>
       </div>
       <div class="form-field">
         <label class="field-label" for="employeeMonthInput">Month</label>
-        ${lookup.employee ? `
-          ${hasMonthData && monthEntries.length ? `
-            <select class="select-input" id="employeeMonthInput" aria-label="Employee month">
-              ${monthEntries.map(([key, label]) => `<option value="${escapeHtml(key)}"${key === lookup.month ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
-            </select>
-          ` : `<div class="picker-note"><span class="loading-spinner small" aria-hidden="true"></span>${hasMonthData ? "No monthly data available" : "Loading available months"}</div>`}
-        ` : `<div class="picker-note">Select an employee first</div>`}
+        <select class="select-input" id="employeeMonthInput" aria-label="Employee month"${lookup.employee && hasMonthData && monthEntries.length ? "" : " disabled"}>
+          ${!lookup.employee
+            ? `<option value="">Select employee first</option>`
+            : !hasMonthData
+              ? `<option value="">Loading available months</option>`
+              : !monthEntries.length
+                ? `<option value="">No monthly data available</option>`
+                : monthEntries.map(([key, label]) => `<option value="${escapeHtml(key)}"${key === lookup.month ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
       </div>
       <button class="load-button" type="submit"${canLoad ? "" : " disabled"}>Load</button>
     </form>
@@ -746,7 +802,7 @@ function renderEmployeeLookup() {
   `);
 
   document.getElementById("employeeLookupForm").addEventListener("submit", handleEmployeeLookup);
-  bindEmployeePicker();
+  bindEmployeeSelect();
   bindMonthSelect();
 
   if (!state.employeeList) {
@@ -853,34 +909,10 @@ async function loadEmployeeList() {
   }
 }
 
-function bindEmployeePicker() {
-  const picker = document.getElementById("employeePicker");
-  const button = document.getElementById("employeePickerButton");
-  const search = document.getElementById("employeePickerSearch");
-  const options = Array.from(document.querySelectorAll(".picker-option"));
-
-  button.addEventListener("click", () => {
-    const isOpen = picker.classList.toggle("is-open");
-    button.setAttribute("aria-expanded", String(isOpen));
-    if (isOpen) {
-      window.requestAnimationFrame(() => search.focus());
-    }
-  });
-
-  search.addEventListener("input", () => {
-    const query = search.value.trim().toUpperCase();
-    options.forEach((option) => {
-      option.hidden = query && !option.dataset.employee.includes(query);
-    });
-  });
-
-  options.forEach((option) => {
-    option.addEventListener("click", () => {
-      picker.classList.remove("is-open");
-      button.setAttribute("aria-expanded", "false");
-      selectEmployee(option.dataset.employee);
-    });
-  });
+function bindEmployeeSelect() {
+  const select = document.getElementById("employeeInput");
+  if (!select) return;
+  select.addEventListener("change", () => selectEmployee(select.value));
 }
 
 function bindMonthSelect() {
@@ -1090,14 +1122,6 @@ function bindEvents() {
   });
 
   els.refresh.addEventListener("click", refreshData);
-
-  document.addEventListener("click", (event) => {
-    const picker = document.getElementById("employeePicker");
-    if (picker && !picker.contains(event.target)) {
-      picker.classList.remove("is-open");
-      document.getElementById("employeePickerButton")?.setAttribute("aria-expanded", "false");
-    }
-  });
 
   window.addEventListener("resize", updateTabs, { passive: true });
 }

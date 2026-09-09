@@ -1,5 +1,6 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbw_q3WkDF_g-Nen-r3Km68Uf_Z0Uvu4vUo8bXG4RUvNbK3nMMVj33-ldbM1Ub1osHEU/exec";
 const API_KEY = "013187";
+const DASHBOARD_CACHE_KEY = "al-raked-dashboard-cache-v1";
 
 const pages = {
   overview: "Overview",
@@ -22,6 +23,8 @@ const state = {
   employeeList: null,
   employeeMonths: {},
   trend: null,
+  trendLoading: false,
+  trendError: false,
   employeeSort: "carsToday",
   employeeLookup: {
     employee: "",
@@ -46,7 +49,7 @@ const splashState = {
   el: null,
   shownAt: 0,
   hidden: false,
-  minDuration: 420,
+  minDuration: 150,
 };
 
 function endpoint(params = {}) {
@@ -64,6 +67,45 @@ async function fetchJson(params) {
   const response = await fetch(endpoint(params), { cache: "no-store" });
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return response.json();
+}
+
+function saveDashboardCache() {
+  if (!state.report) return;
+
+  try {
+    localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      report: state.report,
+      yesterday: state.yesterday,
+      trend: state.trend,
+    }));
+  } catch (error) {
+    console.warn("Dashboard cache could not be saved.", error);
+  }
+}
+
+function restoreDashboardCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(DASHBOARD_CACHE_KEY) || "null");
+    if (!cached?.report || typeof cached.report !== "object") return false;
+
+    state.report = cached.report;
+    state.yesterday = cached.yesterday || {};
+    state.trend = cached.trend?.month === currentMonthKey() ? cached.trend : null;
+    const savedAt = asDate(cached.savedAt);
+    els.updated.textContent = savedAt
+      ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · Refreshing`
+      : "Refreshing latest report";
+    renderActivePage();
+    return true;
+  } catch (error) {
+    try {
+      localStorage.removeItem(DASHBOARD_CACHE_KEY);
+    } catch (removeError) {
+      console.warn("Dashboard cache could not be cleared.", removeError);
+    }
+    return false;
+  }
 }
 
 function formatNumber(value) {
@@ -327,10 +369,10 @@ function sparkline(rows, color = "red") {
     </svg>
     <span class="chart-y-labels">${yMarkers.map((value) => `<b style="top:${(yForValue(value) / height * 100).toFixed(2)}%">${compactAxisValue(value)}</b>`).join("")}</span>
     <span class="chart-x-labels">${axisDays.map((day, index) => `<b class="${index === 0 ? "first" : index === axisDays.length - 1 ? "last" : ""}" style="left:${(xForDay(day) / width * 100).toFixed(2)}%">${day}</b>`).join("")}</span>
-    ${markerIndexes.map((index) => {
+    ${markerIndexes.map((index, markerOrder) => {
       const point = points[index];
       const markerClass = `${index === peakIndex ? " peak" : ""}${index === latestIndex ? " latest" : ""}`;
-      return `<span class="chart-marker${markerClass}" style="left:${(point.x / width * 100).toFixed(2)}%;top:${(point.y / height * 100).toFixed(2)}%"><i></i></span>`;
+      return `<span class="chart-marker${markerClass}" style="--marker-delay:${markerOrder * 260}ms;left:${(point.x / width * 100).toFixed(2)}%;top:${(point.y / height * 100).toFixed(2)}%"><i></i></span>`;
     }).join("")}
     ${hoverTargets}
     </div>
@@ -383,8 +425,48 @@ function trendChange(rows) {
   };
 }
 
-function heroMetric(label, valueHtml, note, values, color, icon) {
-  const change = trendChange(values);
+function trendPlaceholder(color, failed = false) {
+  return `
+    <div class="sparkline-wrap sparkline-placeholder sparkline-${color}" role="status">
+      <span class="chart-placeholder-label">${failed ? "Graph unavailable" : "Loading graph"}</span>
+    </div>
+  `;
+}
+
+function updateOverviewTrend() {
+  if (state.activePage !== "overview") return;
+
+  const graphStatus = state.trendLoading ? "loading" : state.trendError ? "error" : "ready";
+  [
+    { card: els.view.querySelector(".trend-red"), field: "earnings", color: "red" },
+    { card: els.view.querySelector(".trend-blue"), field: "cars", color: "blue" },
+  ].forEach(({ card, field, color }) => {
+    if (!card) return;
+    const values = trendValues(field);
+    const change = graphStatus === "ready"
+      ? trendChange(values)
+      : { text: graphStatus === "error" ? "Graph unavailable" : "Loading graph", direction: "flat" };
+    const changeEl = card.querySelector(".trend-change");
+    const noteEl = card.querySelector(".trend-note");
+    const graphEl = card.querySelector(".sparkline-wrap");
+
+    if (changeEl) {
+      changeEl.className = `trend-change ${change.direction}`;
+      changeEl.textContent = change.text;
+    }
+    if (noteEl) noteEl.textContent = monthLabel(state.trend?.month);
+    if (graphEl) {
+      graphEl.outerHTML = graphStatus === "ready"
+        ? sparkline(values, color)
+        : trendPlaceholder(color, graphStatus === "error");
+    }
+  });
+}
+
+function heroMetric(label, valueHtml, note, values, color, icon, graphStatus = "ready") {
+  const change = graphStatus === "ready"
+    ? trendChange(values)
+    : { text: graphStatus === "error" ? "Graph unavailable" : "Loading graph", direction: "flat" };
   return `
     <article class="trend-card trend-${color}">
       <div class="trend-card-head">
@@ -393,7 +475,7 @@ function heroMetric(label, valueHtml, note, values, color, icon) {
       </div>
       <div class="trend-value">${valueHtml}</div>
       <div class="trend-note">${escapeHtml(note)}</div>
-      ${sparkline(values, color)}
+      ${graphStatus === "ready" ? sparkline(values, color) : trendPlaceholder(color, graphStatus === "error")}
     </article>
   `;
 }
@@ -459,11 +541,14 @@ function animateVisibleCards() {
 
   let revealIndex = 0;
   const viewportCutoff = window.innerHeight * 0.92;
+  const visibleCount = items.filter((item) => item.getBoundingClientRect().top <= viewportCutoff).length;
+  const revealCount = state.activePage === "employees"
+    ? Math.min(items.length, visibleCount + 2)
+    : visibleCount;
 
-  items.forEach((item) => {
-    const rect = item.getBoundingClientRect();
-    if (rect.top <= viewportCutoff) {
-      const delay = Math.min(revealIndex, 4) * 50;
+  items.forEach((item, index) => {
+    if (index < revealCount) {
+      const delay = Math.min(revealIndex, 6) * 50;
       item.style.setProperty("--reveal-delay", `${delay}ms`);
       item.classList.add("is-reveal");
       revealIndex += 1;
@@ -506,11 +591,12 @@ function renderOverview() {
   const yesterday = state.yesterday?.summary;
   const revenueTrend = trendValues("earnings");
   const carsTrend = trendValues("cars");
+  const graphStatus = state.trendLoading ? "loading" : state.trendError ? "error" : "ready";
 
   setView(`
     <section class="trend-grid" aria-label="Today's performance">
-      ${heroMetric("Today's revenue", rollingMetricValue(today?.todayIncl?.earnings, { currency: true }), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`)}
-      ${heroMetric("Cars today", rollingMetricValue(today?.todayIncl?.cars, { label: `${formatNumber(today?.todayIncl?.cars)} cars today` }), monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`)}
+      ${heroMetric("Today's revenue", rollingMetricValue(today?.todayIncl?.earnings, { currency: true }), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`, graphStatus)}
+      ${heroMetric("Cars today", rollingMetricValue(today?.todayIncl?.cars, { label: `${formatNumber(today?.todayIncl?.cars)} cars today` }), monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`, graphStatus)}
     </section>
     <div class="summary-grid">
       ${board("Today", summaryMetricGroup(today, false))}
@@ -1131,27 +1217,47 @@ function renderActivePage() {
   renderers[state.activePage]();
 }
 
-async function refreshData() {
-  state.loading = true;
-  els.refresh.classList.add("is-spinning");
-  showSkeleton(pages[state.activePage]);
-  updateGreeting();
+async function refreshTrend() {
+  const hasExistingTrend = Boolean(state.trend);
+  state.trendLoading = !hasExistingTrend;
+  state.trendError = false;
 
   try {
-    const [report, yesterday, trend] = await Promise.all([
-      fetchJson(),
-      fetchJson({ yesterday: "1" }),
-      fetchJson({ trend: "1", month: currentMonthKey() }),
-    ]);
-    state.report = report || {};
-    state.yesterday = yesterday || {};
-    state.trend = trend || { rows: [] };
-    els.updated.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    renderActivePage();
+    state.trend = await fetchJson({ trend: "1", month: currentMonthKey() });
+    saveDashboardCache();
   } catch (error) {
     console.error(error);
-    els.updated.textContent = "Could not load report";
-    showError("Could not load dashboard data.");
+    state.trendError = !hasExistingTrend;
+  } finally {
+    state.trendLoading = false;
+    updateOverviewTrend();
+  }
+}
+
+async function refreshData() {
+  if (state.loading) return;
+  state.loading = true;
+  els.refresh.classList.add("is-spinning");
+  if (!state.report) showSkeleton(pages[state.activePage]);
+  updateGreeting();
+  state.trendLoading = !state.trend;
+  state.trendError = false;
+  if (state.report && state.activePage === "overview" && state.trendLoading) renderOverview();
+
+  try {
+    const startup = await fetchJson({ startup: "1" });
+    const hasStartupBundle = Boolean(startup?.report && typeof startup.report === "object");
+    state.report = hasStartupBundle ? startup.report : startup || {};
+    state.yesterday = hasStartupBundle ? startup.yesterday || {} : state.yesterday || {};
+    els.updated.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    renderActivePage();
+    saveDashboardCache();
+    requestHideSplash();
+    refreshTrend();
+  } catch (error) {
+    console.error(error);
+    els.updated.textContent = state.report ? "Could not refresh · Showing saved report" : "Could not load report";
+    if (!state.report) showError("Could not load dashboard data.");
   } finally {
     state.loading = false;
     els.refresh.classList.remove("is-spinning");
@@ -1198,6 +1304,8 @@ function boot() {
   bindEvents();
   updateTabs();
   document.fonts?.ready.then(updateTabs);
+  const restored = restoreDashboardCache();
+  if (restored) requestHideSplash();
   refreshData();
 }
 

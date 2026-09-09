@@ -163,6 +163,17 @@ function dateStamp(value) {
   });
 }
 
+function chartDateLabel(value, fallbackDay) {
+  const date = asDate(value);
+  if (!date) return `Day ${fallbackDay}`;
+
+  return date.toLocaleDateString([], {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function currentMonthKey() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -231,7 +242,11 @@ function smoothChartPath(points) {
 }
 
 function sparkline(rows, color = "red") {
-  const clean = rows.map((row) => ({ day: Number(row.day) || 1, value: Number(row.value) || 0 }));
+  const clean = rows.map((row) => ({
+    day: Number(row.day) || 1,
+    date: row.date,
+    value: Number(row.value) || 0,
+  }));
   if (!clean.length) clean.push({ day: 1, value: 0 });
   const width = 420;
   const height = 110;
@@ -275,10 +290,11 @@ function sparkline(rows, color = "red") {
       : `${formatNumber(row.value)} cars`;
     const edgeClass = index === 0 ? " edge-start" : index === points.length - 1 ? " edge-end" : "";
     const peakClass = index === peakIndex ? " is-peak" : "";
-    const pointLabel = index === peakIndex ? `Peak · Day ${row.day}` : `Day ${row.day}`;
+    const dateLabel = chartDateLabel(row.date, row.day);
+    const pointLabel = index === peakIndex ? `Peak · ${dateLabel}` : dateLabel;
     const ariaLabel = index === peakIndex
-      ? `Peak, day ${row.day}, ${valueLabel}`
-      : `Day ${row.day}, ${valueLabel}`;
+      ? `Peak, ${dateLabel}, ${valueLabel}`
+      : `${dateLabel}, ${valueLabel}`;
 
     return `
       <button class="chart-hit${edgeClass}${peakClass}" type="button"
@@ -351,7 +367,7 @@ function compactAxisValue(value) {
 
 function trendValues(field) {
   const rows = Array.isArray(state.trend?.rows) ? state.trend.rows : [];
-  return rows.map((row) => ({ day: row.day, value: row[field] }));
+  return rows.map((row) => ({ day: row.day, date: row.date, value: row[field] }));
 }
 
 function trendChange(rows) {
@@ -679,7 +695,7 @@ function renderCompany() {
   setView(`
     <div class="grid">
       ${board("Total", `
-        <div class="metric-grid">
+        <div class="metric-grid company-total-grid">
           ${metric("Today", total.dailyAmt, total.dailyCars)}
           ${metric("Month", total.monthlyAmt, total.monthlyCars)}
           ${countMetric("Total Cars", total.monthlyCars)}
@@ -825,24 +841,13 @@ function renderEmployeeLookupResult() {
     return `<div class="empty lookup-empty"><strong>${lookup.month ? "Selection ready" : "Loading details"}</strong><span>${message}</span></div>`;
   }
 
-  const current = state.report?.employees?.[result.employee] || state.report?.employees?.[String(result.employee).toUpperCase()] || {};
-  const attendance = attendanceFor(result.employee);
-  const last = lastWorkFor(result.employee);
-
   return `
     <div class="grid">
       ${board("Identity", `
         <div class="detail-list">
           ${detail("Employee", result.employee)}
-          ${detail("Presence", attendance ? "Present" : "Absent")}
-          ${detail("First Work", result.firstWork || clock(attendance?.first))}
-          ${detail("Last Active", result.lastWork || clock(last))}
-        </div>
-      `)}
-      ${board("Today", `
-        <div class="metric-grid">
-          ${countMetric("Cars", current.carsToday || 0)}
-          ${metric("Revenue", current.daily || 0, current.carsToday || 0)}
+          ${detail("First Work", result.firstWork || "-")}
+          ${detail("Last Work", result.lastWork || "-")}
         </div>
       `)}
       ${board("Month", `
@@ -861,12 +866,53 @@ function renderEmployeeLookupResult() {
       `)}
     </div>
     ${Object.prototype.hasOwnProperty.call(result, "companies") ? renderEmployeeBreakdown("Company Work", result.companies, "No company work recorded for this month.") : ""}
-    ${Object.prototype.hasOwnProperty.call(result, "services") ? renderEmployeeBreakdown("Services", result.services, "No service activity recorded for this month.") : ""}
-    ${Object.prototype.hasOwnProperty.call(result, "oils") ? renderEmployeeBreakdown("Oil Activity", result.oils, "No oil activity recorded for this month.") : ""}
-    <div class="divider">Monthly Breakdown</div>
-    ${renderDailyBreakdown(result.dailyBreakdown, result)}
-    ${Object.prototype.hasOwnProperty.call(result, "recentActivity") ? `<div class="divider">Recent Activity</div>${renderRecentActivity(result.recentActivity)}` : ""}
+    ${renderEmployeeBreakdown("Services", result.services, "No service or oil activity recorded for this month.")}
   `;
+}
+
+function updateEmployeeSelectControl() {
+  const select = document.getElementById("employeeInput");
+  if (!select) return;
+
+  const selectedEmployee = state.employeeLookup.employee;
+  select.innerHTML = `
+    <option value="">Select employee</option>
+    ${employeeOptions().map((name) => `<option value="${escapeHtml(name)}"${name === selectedEmployee ? " selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+  `;
+}
+
+function updateEmployeeLookupResult() {
+  const lookup = state.employeeLookup;
+  const resultContainer = document.getElementById("employeeLookupResult");
+  const loadButton = document.querySelector("#employeeLookupForm .load-button");
+  const canLoad = lookup.employee && monthOptionsFor(lookup.employee).length > 0 && lookup.month;
+
+  if (loadButton) loadButton.disabled = !canLoad;
+  if (!resultContainer) return;
+
+  resultContainer.innerHTML = lookup.loading
+    ? `<div class="loading-state"><span class="loading-spinner" aria-hidden="true"></span><strong>Loading employee data</strong><span>Preparing the selected monthly report.</span></div>`
+    : renderEmployeeLookupResult();
+}
+
+function updateEmployeeMonthControl() {
+  const lookup = state.employeeLookup;
+  const select = document.getElementById("employeeMonthInput");
+  const monthEntries = monthOptionsFor(lookup.employee);
+  const hasMonthData = lookup.employee && Object.prototype.hasOwnProperty.call(state.employeeMonths, lookup.employee);
+
+  if (select) {
+    select.disabled = !(lookup.employee && hasMonthData && monthEntries.length);
+    select.innerHTML = !lookup.employee
+      ? `<option value="">Select employee first</option>`
+      : !hasMonthData
+        ? `<option value="">Loading available months</option>`
+        : !monthEntries.length
+          ? `<option value="">No monthly data available</option>`
+          : monthEntries.map(([key, label]) => `<option value="${escapeHtml(key)}"${key === lookup.month ? " selected" : ""}>${escapeHtml(label)}</option>`).join("");
+  }
+
+  updateEmployeeLookupResult();
 }
 
 function renderEmployeeBreakdown(title, data, emptyText) {
@@ -902,7 +948,7 @@ function renderRecentActivity(rows) {
 async function loadEmployeeList() {
   try {
     state.employeeList = await fetchJson({ employeeList: "1" });
-    if (state.activePage === "employeeLookup") renderEmployeeLookup();
+    if (state.activePage === "employeeLookup") updateEmployeeSelectControl();
   } catch (error) {
     console.error(error);
     state.employeeList = [];
@@ -921,7 +967,7 @@ function bindMonthSelect() {
   select.addEventListener("change", () => {
     state.employeeLookup.month = select.value;
     state.employeeLookup.result = null;
-    renderEmployeeLookup();
+    updateEmployeeLookupResult();
   });
 }
 
@@ -930,17 +976,34 @@ async function selectEmployee(employee) {
   state.employeeLookup.employee = employee;
   state.employeeLookup.result = null;
   state.employeeLookup.month = "";
-  renderEmployeeLookup();
-  if (!employee || state.employeeMonths[employee]) return;
+
+  if (!employee) {
+    updateEmployeeMonthControl();
+    return;
+  }
+
+  if (state.employeeMonths[employee]) {
+    const entries = monthOptionsFor(employee);
+    state.employeeLookup.month = entries[0]?.[0] || "";
+    updateEmployeeMonthControl();
+    return;
+  }
+
+  updateEmployeeMonthControl();
 
   try {
     state.employeeMonths[employee] = await fetchJson({ employeeMonths: employee });
     const entries = monthOptionsFor(employee);
     state.employeeLookup.month = entries[0]?.[0] || "";
-    if (state.activePage === "employeeLookup") renderEmployeeLookup();
+    if (state.activePage === "employeeLookup" && state.employeeLookup.employee === employee) {
+      updateEmployeeMonthControl();
+    }
   } catch (error) {
     console.error(error);
     state.employeeMonths[employee] = {};
+    if (state.activePage === "employeeLookup" && state.employeeLookup.employee === employee) {
+      updateEmployeeMonthControl();
+    }
   }
 }
 
@@ -954,12 +1017,12 @@ async function handleEmployeeLookup(event) {
   state.employeeLookup.result = null;
 
   if (!employee) {
-    renderEmployeeLookup();
+    updateEmployeeLookupResult();
     return;
   }
 
   state.employeeLookup.loading = true;
-  renderEmployeeLookup();
+  updateEmployeeLookupResult();
 
   try {
     state.employeeLookup.result = await fetchJson({ employeePerformance: employee, month });
@@ -968,7 +1031,7 @@ async function handleEmployeeLookup(event) {
     state.employeeLookup.result = null;
   } finally {
     state.employeeLookup.loading = false;
-    renderEmployeeLookup();
+    updateEmployeeLookupResult();
   }
 }
 

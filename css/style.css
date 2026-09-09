@@ -871,6 +871,10 @@ body.light .splash-logo {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .company-total-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .lookup-form {
     grid-template-columns: minmax(220px, 1.5fr) minmax(180px, 1fr) auto;
     align-items: end;
@@ -1075,6 +1079,11 @@ body.light .tab.is-active {
 
 :root.light .tab-indicator,
 body.light .tab-indicator { background: #fff; }
+
+html:not(.light) .tab-indicator,
+body:not(.light) .tab-indicator {
+  background: rgba(255, 255, 255, 0.12);
+}
 
 .page-head h1 {
   letter-spacing: -0.045em;
@@ -1828,11 +1837,40 @@ body.light .tab-indicator { background: #fff; }
   .trend-change { font-size: 11px; padding: 4px 7px; }
   .summary-grid { grid-template-columns: 1fr; }
 
-  .employee-row {
-    grid-template-columns: minmax(0, 1.3fr) minmax(110px, 0.7fr);
+  .employee-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
-  .employee-stat:nth-of-type(3) { display: none; }
+  .employee-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 9px;
+    padding: 14px;
+  }
+
+  .employee-person {
+    grid-column: 1 / -1;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .employee-stat {
+    display: block;
+    border-radius: 14px;
+    background: var(--surface-2);
+    padding: 10px;
+  }
+
+  .employee-stat:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .employee-stat small {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+  }
 
   .section-tools { align-items: stretch; flex-direction: column; gap: 7px; }
   .compact-select { width: 100%; }
@@ -1844,8 +1882,8 @@ body.light .tab-indicator { background: #fff; }
   .app-shell { padding-left: 12px; padding-right: 12px; }
   .tabs { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
   .trend-card { border-radius: 21px; }
-  .employee-row { grid-template-columns: minmax(0, 1fr) minmax(104px, 0.7fr); gap: 8px; }
-  .employee-stat:nth-of-type(2) { display: none; }
+  .employee-board { grid-template-columns: 1fr; }
+  .employee-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .search-form { display: grid; }
   .search-button { width: 100%; min-height: 48px; }
   .breakdown-row, .activity-row { align-items: flex-start; }

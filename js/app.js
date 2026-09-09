@@ -883,7 +883,7 @@ function renderEmployeeLookup() {
   const hasMonthData = lookup.employee && Object.prototype.hasOwnProperty.call(state.employeeMonths, lookup.employee);
   const canLoad = lookup.employee && monthEntries.length > 0 && lookup.month;
   const resultHtml = lookup.loading
-    ? `<div class="loading-state"><span class="loading-spinner" aria-hidden="true"></span><strong>Loading employee data</strong><span>Preparing the selected monthly report.</span></div>`
+    ? `<div class="loading-state"><span class="loading-spinner" aria-hidden="true"></span><strong>Preparing report</strong><span>This may take a few seconds.</span></div>`
     : renderEmployeeLookupResult();
 
   setView(`
@@ -926,14 +926,14 @@ function renderEmployeeLookupResult() {
   const result = lookup.result;
 
   if (!lookup.employee) {
-    return `<div class="empty lookup-empty"><strong>Waiting for employee and month</strong><span>Select both fields to load performance details.</span></div>`;
+    return `<div class="empty lookup-empty"><strong>No report selected</strong><span>Choose an employee and month above.</span></div>`;
   }
 
   if (!result) {
     const message = lookup.month
-      ? `Choose Load to view ${escapeHtml(lookup.employee)} for ${escapeHtml(monthLabel(lookup.month))}.`
-      : `Loading the available months for ${escapeHtml(lookup.employee)}.`;
-    return `<div class="empty lookup-empty"><strong>${lookup.month ? "Selection ready" : "Loading details"}</strong><span>${message}</span></div>`;
+      ? `${escapeHtml(lookup.employee)} · ${escapeHtml(monthLabel(lookup.month))}`
+      : escapeHtml(lookup.employee);
+    return `<div class="empty lookup-empty"><strong>${lookup.month ? "Ready" : "Checking availability"}</strong><span>${message}</span></div>`;
   }
 
   return `
@@ -986,7 +986,7 @@ function updateEmployeeLookupResult() {
   if (!resultContainer) return;
 
   resultContainer.innerHTML = lookup.loading
-    ? `<div class="loading-state"><span class="loading-spinner" aria-hidden="true"></span><strong>Loading employee data</strong><span>Preparing the selected monthly report.</span></div>`
+    ? `<div class="loading-state"><span class="loading-spinner" aria-hidden="true"></span><strong>Preparing report</strong><span>This may take a few seconds.</span></div>`
     : renderEmployeeLookupResult();
 
   if (!lookup.loading && lookup.result) {

@@ -283,7 +283,7 @@ function smoothChartPath(points) {
   }, `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`);
 }
 
-function sparkline(rows, color = "red") {
+function sparkline(rows, color = "red", animate = true) {
   const clean = rows.map((row) => ({
     day: Number(row.day) || 1,
     date: row.date,
@@ -352,7 +352,7 @@ function sparkline(rows, color = "red") {
   }).join("");
   const id = `chartFade${chartId++}`;
   return `
-    <div class="sparkline-wrap sparkline-${color}">
+    <div class="sparkline-wrap sparkline-${color}${animate ? "" : " sparkline-static"}">
     <svg class="sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
@@ -361,14 +361,14 @@ function sparkline(rows, color = "red") {
           <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
-      <g class="chart-grid">${yMarkers.map((value) => {
+      <g class="chart-grid">${yMarkers.map((value, index) => {
         const y = yForValue(value).toFixed(1);
-        return `<line x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}"></line>`;
+        return `<line x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}" style="--axis-delay:${100 + index * 80}ms"></line>`;
       }).join("")}</g>
       <g class="chart-series"><path class="spark-area" d="${areaPath}" fill="url(#${id})"></path><path class="spark-path" d="${path}"></path></g>
     </svg>
-    <span class="chart-y-labels">${yMarkers.map((value) => `<b style="top:${(yForValue(value) / height * 100).toFixed(2)}%">${compactAxisValue(value)}</b>`).join("")}</span>
-    <span class="chart-x-labels">${axisDays.map((day, index) => `<b class="${index === 0 ? "first" : index === axisDays.length - 1 ? "last" : ""}" style="left:${(xForDay(day) / width * 100).toFixed(2)}%">${day}</b>`).join("")}</span>
+    <span class="chart-y-labels">${yMarkers.map((value, index) => `<b style="--axis-delay:${100 + index * 80}ms;top:${(yForValue(value) / height * 100).toFixed(2)}%">${compactAxisValue(value)}</b>`).join("")}</span>
+    <span class="chart-x-labels">${axisDays.map((day, index) => `<b class="${index === 0 ? "first" : index === axisDays.length - 1 ? "last" : ""}" style="--axis-delay:${340 + index * 80}ms;left:${(xForDay(day) / width * 100).toFixed(2)}%">${day}</b>`).join("")}</span>
     ${markerIndexes.map((index, markerOrder) => {
       const point = points[index];
       const markerClass = `${index === peakIndex ? " peak" : ""}${index === latestIndex ? " latest" : ""}`;
@@ -427,13 +427,13 @@ function trendChange(rows) {
 
 function trendPlaceholder(color, failed = false) {
   return `
-    <div class="sparkline-wrap sparkline-placeholder sparkline-${color}" role="status">
-      <span class="chart-placeholder-label">${failed ? "Graph unavailable" : "Loading graph"}</span>
+    <div class="sparkline-wrap sparkline-placeholder sparkline-${color}"${failed ? ` role="status"` : ""}>
+      ${failed ? `<span class="chart-placeholder-label">Graph unavailable</span>` : ""}
     </div>
   `;
 }
 
-function updateOverviewTrend() {
+function updateOverviewTrend(animate = true) {
   if (state.activePage !== "overview") return;
 
   const graphStatus = state.trendLoading ? "loading" : state.trendError ? "error" : "ready";
@@ -445,7 +445,7 @@ function updateOverviewTrend() {
     const values = trendValues(field);
     const change = graphStatus === "ready"
       ? trendChange(values)
-      : { text: graphStatus === "error" ? "Graph unavailable" : "Loading graph", direction: "flat" };
+      : { text: graphStatus === "error" ? "Graph unavailable" : "", direction: "flat" };
     const changeEl = card.querySelector(".trend-change");
     const noteEl = card.querySelector(".trend-note");
     const graphEl = card.querySelector(".sparkline-wrap");
@@ -457,16 +457,16 @@ function updateOverviewTrend() {
     if (noteEl) noteEl.textContent = monthLabel(state.trend?.month);
     if (graphEl) {
       graphEl.outerHTML = graphStatus === "ready"
-        ? sparkline(values, color)
+        ? sparkline(values, color, animate)
         : trendPlaceholder(color, graphStatus === "error");
     }
   });
 }
 
-function heroMetric(label, valueHtml, note, values, color, icon, graphStatus = "ready") {
+function heroMetric(label, valueHtml, note, values, color, icon, graphStatus = "ready", animateGraph = true) {
   const change = graphStatus === "ready"
     ? trendChange(values)
-    : { text: graphStatus === "error" ? "Graph unavailable" : "Loading graph", direction: "flat" };
+    : { text: graphStatus === "error" ? "Graph unavailable" : "", direction: "flat" };
   return `
     <article class="trend-card trend-${color}">
       <div class="trend-card-head">
@@ -475,7 +475,7 @@ function heroMetric(label, valueHtml, note, values, color, icon, graphStatus = "
       </div>
       <div class="trend-value">${valueHtml}</div>
       <div class="trend-note">${escapeHtml(note)}</div>
-      ${graphStatus === "ready" ? sparkline(values, color) : trendPlaceholder(color, graphStatus === "error")}
+      ${graphStatus === "ready" ? sparkline(values, color, animateGraph) : trendPlaceholder(color, graphStatus === "error")}
     </article>
   `;
 }
@@ -530,13 +530,13 @@ function showError(message) {
   `;
 }
 
-function setView(html) {
-  els.view.innerHTML = `<div class="page-in">${html}</div>`;
-  window.requestAnimationFrame(animateVisibleCards);
+function setView(html, animate = true) {
+  els.view.innerHTML = `<div class="page-in${animate ? "" : " page-in-static"}">${html}</div>`;
+  if (animate) window.requestAnimationFrame(() => animateVisibleCards());
 }
 
-function animateVisibleCards() {
-  const items = Array.from(els.view.querySelectorAll(".card, .board"));
+function animateVisibleCards(root = els.view) {
+  const items = Array.from(root.querySelectorAll(".card, .board, .trend-card, .breakdown-list"));
   if (!items.length) return;
 
   let revealIndex = 0;
@@ -553,6 +553,15 @@ function animateVisibleCards() {
       item.classList.add("is-reveal");
       revealIndex += 1;
     }
+  });
+}
+
+function animateGeneratedLookupCards(root) {
+  const items = Array.from(root.querySelectorAll(".board, .breakdown-list"));
+
+  items.forEach((item, index) => {
+    item.style.setProperty("--reveal-delay", `${Math.min(index, 6) * 50}ms`);
+    item.classList.add("is-reveal");
   });
 }
 
@@ -586,7 +595,7 @@ function summaryMetricGroup(summary, includeMonth) {
   return `<div class="metric-grid">${cards.join("")}</div>`;
 }
 
-function renderOverview() {
+function renderOverview(animate = true) {
   const today = state.report?.summary;
   const yesterday = state.yesterday?.summary;
   const revenueTrend = trendValues("earnings");
@@ -595,8 +604,8 @@ function renderOverview() {
 
   setView(`
     <section class="trend-grid" aria-label="Today's performance">
-      ${heroMetric("Today's revenue", rollingMetricValue(today?.todayIncl?.earnings, { currency: true }), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`, graphStatus)}
-      ${heroMetric("Cars today", rollingMetricValue(today?.todayIncl?.cars, { label: `${formatNumber(today?.todayIncl?.cars)} cars today` }), monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`, graphStatus)}
+      ${heroMetric("Today's revenue", rollingMetricValue(today?.todayIncl?.earnings, { currency: true }), monthLabel(state.trend?.month), revenueTrend, "red", `<svg viewBox="0 0 24 24"><path d="M5 7h14v10H5z"></path><path d="M8 10h8M8 14h5"></path></svg>`, graphStatus, animate)}
+      ${heroMetric("Cars today", rollingMetricValue(today?.todayIncl?.cars, { label: `${formatNumber(today?.todayIncl?.cars)} cars today` }), monthLabel(state.trend?.month), carsTrend, "blue", `<svg viewBox="0 0 24 24"><path d="m5 15 1.5-5h11l1.5 5"></path><path d="M4 15h16v4H4z"></path><circle cx="7" cy="18" r="1"></circle><circle cx="17" cy="18" r="1"></circle></svg>`, graphStatus, animate)}
     </section>
     <div class="summary-grid">
       ${board("Today", summaryMetricGroup(today, false))}
@@ -608,7 +617,7 @@ function renderOverview() {
         </div>
       `)}
     </div>
-  `);
+  `, animate);
 }
 
 function attendanceFor(name) {
@@ -979,6 +988,10 @@ function updateEmployeeLookupResult() {
   resultContainer.innerHTML = lookup.loading
     ? `<div class="loading-state"><span class="loading-spinner" aria-hidden="true"></span><strong>Loading employee data</strong><span>Preparing the selected monthly report.</span></div>`
     : renderEmployeeLookupResult();
+
+  if (!lookup.loading && lookup.result) {
+    animateGeneratedLookupCards(resultContainer);
+  }
 }
 
 function updateEmployeeMonthControl() {
@@ -1219,38 +1232,49 @@ function renderActivePage() {
 
 async function refreshTrend() {
   const hasExistingTrend = Boolean(state.trend);
+  let shouldUpdateOverview = !hasExistingTrend;
   state.trendLoading = !hasExistingTrend;
   state.trendError = false;
 
   try {
-    state.trend = await fetchJson({ trend: "1", month: currentMonthKey() });
+    const nextTrend = await fetchJson({ trend: "1", month: currentMonthKey() });
+    shouldUpdateOverview = !hasExistingTrend || JSON.stringify(nextTrend) !== JSON.stringify(state.trend);
+    state.trend = nextTrend;
     saveDashboardCache();
   } catch (error) {
     console.error(error);
     state.trendError = !hasExistingTrend;
   } finally {
     state.trendLoading = false;
-    updateOverviewTrend();
+    if (shouldUpdateOverview) updateOverviewTrend(!hasExistingTrend);
   }
 }
 
 async function refreshData() {
   if (state.loading) return;
+  const overviewAlreadyRendered = state.activePage === "overview" && Boolean(els.view.querySelector(".trend-grid"));
   state.loading = true;
   els.refresh.classList.add("is-spinning");
   if (!state.report) showSkeleton(pages[state.activePage]);
   updateGreeting();
   state.trendLoading = !state.trend;
   state.trendError = false;
-  if (state.report && state.activePage === "overview" && state.trendLoading) renderOverview();
 
   try {
     const startup = await fetchJson({ startup: "1" });
     const hasStartupBundle = Boolean(startup?.report && typeof startup.report === "object");
-    state.report = hasStartupBundle ? startup.report : startup || {};
-    state.yesterday = hasStartupBundle ? startup.yesterday || {} : state.yesterday || {};
+    const nextReport = hasStartupBundle ? startup.report : startup || {};
+    const nextYesterday = hasStartupBundle ? startup.yesterday || {} : state.yesterday || {};
+    const overviewChanged = JSON.stringify(nextReport) !== JSON.stringify(state.report)
+      || JSON.stringify(nextYesterday) !== JSON.stringify(state.yesterday);
+    state.report = nextReport;
+    state.yesterday = nextYesterday;
     els.updated.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    renderActivePage();
+    if (overviewAlreadyRendered && state.activePage === "overview" && overviewChanged) {
+      renderOverview(false);
+    } else if (!overviewAlreadyRendered || state.activePage !== "overview") {
+      renderActivePage();
+    }
     saveDashboardCache();
     requestHideSplash();
     refreshTrend();
@@ -1285,6 +1309,16 @@ function initTheme() {
   preference.addEventListener?.("change", syncTheme);
 }
 
+function finishFirstPaint() {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      document.documentElement.classList.remove("is-booting");
+      document.documentElement.style.removeProperty("color-scheme");
+      document.documentElement.style.removeProperty("background-color");
+    });
+  });
+}
+
 function bindEvents() {
   els.tabs.forEach((tab) => {
     tab.addEventListener("click", () => setPage(tab.dataset.page));
@@ -1300,12 +1334,12 @@ function boot() {
   if (pages[hashPage]) state.activePage = hashPage;
   updateGreeting();
   initTheme();
-  mountSplash();
   bindEvents();
   updateTabs();
   document.fonts?.ready.then(updateTabs);
   const restored = restoreDashboardCache();
-  if (restored) requestHideSplash();
+  if (!restored) mountSplash();
+  finishFirstPaint();
   refreshData();
 }
 

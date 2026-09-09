@@ -53,6 +53,12 @@ body.light {
   box-sizing: border-box;
 }
 
+html.is-booting *,
+html.is-booting *::before,
+html.is-booting *::after {
+  transition: none !important;
+}
+
 @property --digit-feather {
   syntax: "<percentage>";
   inherits: false;
@@ -358,6 +364,11 @@ body.light .tab.is-active {
   will-change: transform, opacity;
 }
 
+.page-in-static {
+  animation: none;
+  will-change: auto;
+}
+
 .grid {
   display: grid;
   gap: 12px;
@@ -397,7 +408,9 @@ body.light .tab.is-active {
 }
 
 .board.is-reveal,
-.card.is-reveal {
+.card.is-reveal,
+.trend-card.is-reveal,
+.breakdown-list.is-reveal {
   animation: cardIn 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   animation-delay: var(--reveal-delay, 0ms);
   will-change: transform, opacity;
@@ -652,7 +665,8 @@ body.light .tab.is-active {
   border-color: transparent;
 }
 
-html:not(.light) .month-pill.is-active {
+html:not(.light) .month-pill.is-active,
+body:not(.light) .month-pill.is-active {
   background: linear-gradient(180deg, #272a33, #1d2027);
   color: var(--text);
 }
@@ -832,6 +846,8 @@ body.light .splash-logo {
   .page-in,
   .board.is-reveal,
   .card.is-reveal,
+  .trend-card.is-reveal,
+  .breakdown-list.is-reveal,
   .skeleton,
   .sparkline-placeholder,
   .icon-button.is-spinning .refresh-icon {
@@ -1086,7 +1102,8 @@ body.light .tab.is-active {
 :root.light .tab-indicator,
 body.light .tab-indicator { background: #fff; }
 
-html:not(.light) .tab-indicator {
+html:not(.light) .tab-indicator,
+body:not(.light) .tab-indicator {
   background: rgba(31, 34, 42, 0.96);
 }
 
@@ -1119,7 +1136,8 @@ html:not(.light) .tab-indicator {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent), var(--surface);
   padding: 16px;
   box-shadow: var(--shadow);
-  animation: cardIn 420ms cubic-bezier(.2,.8,.2,1) both;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .trend-card-head {
@@ -1349,9 +1367,9 @@ html:not(.light) .tab-indicator {
 }
 
 .sparkline-wrap {
-  --chart-reveal-delay: 180ms;
-  --chart-reveal-duration: 1800ms;
-  --chart-marker-pause: 220ms;
+  --chart-reveal-delay: 620ms;
+  --chart-reveal-duration: 1450ms;
+  --chart-marker-pause: 180ms;
   --chart-marker-stagger: 260ms;
   position: absolute;
   right: 16px;
@@ -1363,11 +1381,9 @@ html:not(.light) .tab-indicator {
 .sparkline-placeholder {
   overflow: hidden;
   border-radius: 12px;
-  background:
-    linear-gradient(to bottom, transparent 31%, color-mix(in srgb, currentColor 9%, transparent) 32%, transparent 33%, transparent 65%, color-mix(in srgb, currentColor 9%, transparent) 66%, transparent 67%),
-    linear-gradient(105deg, transparent 35%, color-mix(in srgb, currentColor 13%, transparent) 48%, transparent 61%);
-  background-size: 100% 100%, 220% 100%;
-  animation: chartPlaceholderShimmer 1200ms linear infinite;
+  background: linear-gradient(to bottom,
+    transparent 31%, color-mix(in srgb, currentColor 8%, transparent) 32%, transparent 33%,
+    transparent 65%, color-mix(in srgb, currentColor 8%, transparent) 66%, transparent 67%);
 }
 
 .chart-placeholder-label {
@@ -1377,11 +1393,6 @@ html:not(.light) .tab-indicator {
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
-}
-
-@keyframes chartPlaceholderShimmer {
-  from { background-position: 0 0, 120% 0; }
-  to { background-position: 0 0, -120% 0; }
 }
 
 .sparkline {
@@ -1520,8 +1531,9 @@ html:not(.light) .tab-indicator {
 .chart-grid line {
   stroke: currentColor;
   stroke-width: 0.65;
-  opacity: 0.075;
+  opacity: 0;
   vector-effect: non-scaling-stroke;
+  animation: chartGuideIn 360ms var(--axis-delay, 100ms) cubic-bezier(.22, 1, .36, 1) forwards;
 }
 
 .chart-y-labels,
@@ -1541,25 +1553,44 @@ html:not(.light) .tab-indicator {
   line-height: 1;
   font-weight: 700;
   white-space: nowrap;
+  opacity: 0;
+  filter: blur(2px);
+  animation: chartAxisIn 360ms var(--axis-delay, 100ms) cubic-bezier(.22, 1, .36, 1) forwards;
 }
 
 .chart-y-labels b {
   right: calc(100% + 7px);
   transform: translateY(-50%);
-  opacity: 0.58;
+  --axis-opacity: 0.58;
 }
 
 .chart-x-labels b {
   bottom: 1px;
   transform: translateX(-50%);
-  opacity: 0.7;
+  --axis-opacity: 0.7;
 }
 
 .chart-x-labels .first { transform: none; }
 .chart-x-labels .last { transform: translateX(-100%); }
 
 @keyframes revealChart { to { clip-path: inset(0 0 0 0); } }
+@keyframes chartGuideIn { to { opacity: 0.075; } }
+@keyframes chartAxisIn { to { opacity: var(--axis-opacity); filter: blur(0); } }
 @keyframes markerIn { to { opacity: 1; } }
+
+.sparkline-static .chart-series,
+.sparkline-static .chart-grid line,
+.sparkline-static .chart-y-labels b,
+.sparkline-static .chart-x-labels b,
+.sparkline-static .chart-marker {
+  animation: none;
+}
+
+.sparkline-static .chart-series { clip-path: none; }
+.sparkline-static .chart-grid line { opacity: 0.075; }
+.sparkline-static .chart-y-labels b,
+.sparkline-static .chart-x-labels b { opacity: var(--axis-opacity); filter: none; }
+.sparkline-static .chart-marker { opacity: 1; }
 
 .section-tools {
   display: flex;
@@ -1947,6 +1978,9 @@ html:not(.light) .tab-indicator {
   .rolling-digit-track { transform: translate3d(0, -1em, 0); }
 
   .chart-series,
+  .chart-grid line,
+  .chart-y-labels b,
+  .chart-x-labels b,
   .chart-marker::after,
   .trend-card,
   .loading-spinner,
@@ -1958,6 +1992,9 @@ html:not(.light) .tab-indicator {
   .spark-path { stroke-dashoffset: 0; }
   .chart-marker::after { opacity: 0; }
   .chart-marker { opacity: 1; }
+  .chart-grid line { opacity: 0.075; }
+  .chart-y-labels b,
+  .chart-x-labels b { opacity: var(--axis-opacity); filter: none; }
   .chart-series { clip-path: none; }
   .donut-track,
   .donut-segment { opacity: 1; transform: scale(1); }
